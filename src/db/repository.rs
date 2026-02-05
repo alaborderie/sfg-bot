@@ -20,12 +20,13 @@ pub trait Repository: Send + Sync {
         region: &str,
     ) -> Result<Summoner, RepositoryError>;
 
-    async fn get_summoner_by_puuid(&self, puuid: &str) -> Result<Option<Summoner>, RepositoryError>;
+    async fn get_summoner_by_puuid(&self, puuid: &str)
+    -> Result<Option<Summoner>, RepositoryError>;
 
     async fn get_all_summoners(&self) -> Result<Vec<Summoner>, RepositoryError>;
 
     async fn insert_active_game(&self, game: &NewActiveGame)
-        -> Result<ActiveGame, RepositoryError>;
+    -> Result<ActiveGame, RepositoryError>;
 
     async fn get_active_game(
         &self,
@@ -91,7 +92,10 @@ impl Repository for PgRepository {
         Ok(summoner)
     }
 
-    async fn get_summoner_by_puuid(&self, puuid: &str) -> Result<Option<Summoner>, RepositoryError> {
+    async fn get_summoner_by_puuid(
+        &self,
+        puuid: &str,
+    ) -> Result<Option<Summoner>, RepositoryError> {
         let summoner =
             sqlx::query_as::<_, Summoner>("SELECT * FROM summoners WHERE riot_puuid = $1")
                 .bind(puuid)

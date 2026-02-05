@@ -1,8 +1,8 @@
 use crate::riot::models::{ActiveGameInfo, MatchResult, SummonerInfo};
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
-use riven::consts::{PlatformRoute, RegionalRoute};
 use riven::RiotApi;
+use riven::consts::{PlatformRoute, RegionalRoute};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

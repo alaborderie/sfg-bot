@@ -95,11 +95,7 @@ mod check_summoner_game_state {
             .times(1)
             .returning(|_| Ok(vec![]));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
@@ -130,11 +126,7 @@ mod check_summoner_game_state {
             .times(1)
             .returning(move |_| Ok(vec![create_test_active_game(summoner_id, 12345)]));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
@@ -165,11 +157,7 @@ mod check_summoner_game_state {
             .times(1)
             .returning(move |_| Ok(vec![create_test_active_game(summoner_id, 11111)]));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
@@ -199,11 +187,7 @@ mod check_summoner_game_state {
             .times(1)
             .returning(|_| Ok(vec![]));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
@@ -229,11 +213,7 @@ mod check_summoner_game_state {
             .times(1)
             .returning(move |_| Ok(vec![create_test_active_game(summoner_id, 12345)]));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
@@ -252,11 +232,7 @@ mod check_summoner_game_state {
 
         let mock_repo = MockRepository::new();
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await;
 
@@ -279,11 +255,7 @@ mod check_summoner_game_state {
             .times(1)
             .returning(|_| Err(RepositoryError::Database(sqlx::Error::RowNotFound)));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await;
 
@@ -324,11 +296,7 @@ mod handle_game_started {
                 })
             });
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.handle_game_started(&summoner, &game_info).await;
 
@@ -348,11 +316,7 @@ mod handle_game_started {
             .times(1)
             .returning(|_| Err(RepositoryError::Database(sqlx::Error::RowNotFound)));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.handle_game_started(&summoner, &game_info).await;
 
@@ -388,13 +352,11 @@ mod handle_game_ended {
         mock_repo
             .expect_insert_match_result()
             .times(1)
-            .returning(move |new_match| Ok(create_test_match_history(summoner_id, new_match.game_id)));
+            .returning(move |new_match| {
+                Ok(create_test_match_history(summoner_id, new_match.game_id))
+            });
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 
@@ -407,7 +369,7 @@ mod handle_game_ended {
     #[tokio::test]
     async fn returns_none_when_match_not_found() {
         tokio::time::pause();
-        
+
         let summoner = create_test_summoner();
         let game_id = 12345i64;
 
@@ -428,11 +390,7 @@ mod handle_game_ended {
             .times(1)
             .returning(|_, _| Ok(()));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 
@@ -452,11 +410,7 @@ mod handle_game_ended {
             .times(1)
             .returning(|_, _| Err(RepositoryError::Database(sqlx::Error::RowNotFound)));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.handle_game_ended(&summoner, game_id).await;
 
@@ -488,11 +442,7 @@ mod handle_game_ended {
             .times(1)
             .returning(|_| Err(RepositoryError::Database(sqlx::Error::RowNotFound)));
 
-        let tracker = GameTracker::new(
-            Arc::new(mock_riot),
-            Arc::new(mock_repo),
-            "na1".to_string(),
-        );
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 

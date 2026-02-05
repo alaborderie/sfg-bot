@@ -1,4 +1,4 @@
-use sfg_bot::config::{parse_summoner_names, ConfigError};
+use sfg_bot::config::{ConfigError, parse_summoner_names};
 
 mod error_messages {
     use super::*;

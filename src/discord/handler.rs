@@ -77,7 +77,11 @@ async fn start_polling_task(
     riot_client: Arc<dyn RiotApiClient>,
     config: Config,
 ) {
-    let tracker = GameTracker::new(riot_client, repository.clone(), config.default_region.clone());
+    let tracker = GameTracker::new(
+        riot_client,
+        repository.clone(),
+        config.default_region.clone(),
+    );
     let channel_id = ChannelId::new(config.discord_channel_id);
     let interval_secs = config.polling_interval_secs;
 

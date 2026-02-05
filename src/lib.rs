@@ -3,7 +3,7 @@ pub mod db;
 pub mod discord;
 pub mod riot;
 
-pub use config::{parse_summoner_names, Config, ConfigError, SummonerConfig};
+pub use config::{Config, ConfigError, SummonerConfig, parse_summoner_names};
 pub use db::repository::{PgRepository, Repository, RepositoryError};
 pub use riot::client::{RiotApiClient, RiotClient, RiotClientError};
 pub use riot::tracker::{GameTracker, TrackerError};

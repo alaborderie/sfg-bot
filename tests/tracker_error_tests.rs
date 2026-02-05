@@ -1,5 +1,5 @@
-use sfg_bot::riot::tracker::TrackerError;
 use sfg_bot::RepositoryError;
+use sfg_bot::riot::tracker::TrackerError;
 
 mod tracker_error {
     use super::*;
