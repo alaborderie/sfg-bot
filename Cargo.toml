@@ -1,0 +1,53 @@
+[package]
+name = "sfg-bot"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.71"
+description = "Discord bot for tracking SouthFoxGaming League of Legends games"
+authors = ["Antoine Laborderie"]
+license = "MIT"
+
+[dependencies]
+# Discord API
+serenity = { version = "0.12.5", features = ["client", "gateway", "model", "cache", "rustls_backend"] }
+
+# Riot Games API
+riven = "2"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "migrate"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Environment and configuration
+dotenvy = "0.15"
+
+# Logging/Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Error handling
+thiserror = "2"
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[[bin]]
+name = "sfg-bot"
+path = "src/main.rs"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
