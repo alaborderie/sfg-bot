@@ -1,4 +1,4 @@
-FROM rust:1.83-alpine AS builder
+FROM rust:1.93-alpine AS builder
 
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 
@@ -22,7 +22,7 @@ ENV SQLX_OFFLINE=true
 RUN touch src/main.rs && cargo build --release
 
 # Runtime stage
-FROM alpine:3.21
+FROM alpine:3.23
 
 RUN apk --no-cache add ca-certificates
 

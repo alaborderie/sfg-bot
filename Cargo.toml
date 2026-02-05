@@ -1,11 +1,15 @@
 [package]
 name = "sfg-bot"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.71"
+edition = "2024"
+rust-version = "1.93"
 description = "Discord bot for tracking SouthFoxGaming League of Legends games"
 authors = ["Antoine Laborderie"]
 license = "MIT"
+
+[features]
+default = []
+test-mocks = ["mockall"]
 
 [dependencies]
 # Discord API
@@ -40,8 +44,15 @@ chrono = { version = "0.4", features = ["serde"] }
 # UUID
 uuid = { version = "1", features = ["v4", "serde"] }
 
+# Async trait support
+async-trait = "0.1"
+
+# Mocking (optional, for tests)
+mockall = { version = "0.13", optional = true }
+
 [dev-dependencies]
 tokio-test = "0.4"
+mockall = "0.13"
 
 [[bin]]
 name = "sfg-bot"

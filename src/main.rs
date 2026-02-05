@@ -1,7 +1,9 @@
 use sfg_bot::config::Config;
 use sfg_bot::db;
+use sfg_bot::db::repository::PgRepository;
 use sfg_bot::discord::handler::Bot;
 use sfg_bot::riot::client::RiotClient;
+use sfg_bot::{Repository, RiotApiClient};
 
 use serenity::prelude::*;
 use std::sync::Arc;
@@ -41,8 +43,11 @@ async fn main() {
     tracing::info!("Database migrations complete");
 
     // Create Riot API client
-    let riot_client = Arc::new(RiotClient::new(&config.riot_api_key));
+    let riot_client: Arc<dyn RiotApiClient> = Arc::new(RiotClient::new(&config.riot_api_key));
     tracing::info!("Riot API client initialized");
+
+    // Create repository
+    let repository = Arc::new(PgRepository::new(db_pool.clone()));
 
     // Resolve summoner PUUIDs and upsert to database
     for summoner_config in &config.summoner_names {
@@ -55,14 +60,14 @@ async fn main() {
             .await
         {
             Ok(summoner_info) => {
-                if let Err(e) = db::repository::upsert_summoner(
-                    &db_pool,
-                    &summoner_info.puuid,
-                    &summoner_info.game_name,
-                    &summoner_info.tag_line,
-                    &config.default_region,
-                )
-                .await
+                if let Err(e) = repository
+                    .upsert_summoner(
+                        &summoner_info.puuid,
+                        &summoner_info.game_name,
+                        &summoner_info.tag_line,
+                        &config.default_region,
+                    )
+                    .await
                 {
                     tracing::error!(
                         "Failed to upsert summoner {}#{}: {}",
@@ -94,7 +99,7 @@ async fn main() {
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let bot = Bot::new(db_pool, riot_client, config);
+    let bot = Bot::new(repository, riot_client, config);
 
     let mut client = Client::builder(&bot.config.discord_bot_token, intents)
         .event_handler(bot)

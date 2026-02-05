@@ -1,8 +1,8 @@
 use crate::config::Config;
 use crate::db::models::Summoner;
-use crate::db::repository;
+use crate::db::repository::Repository;
 use crate::discord::messages::{format_game_ended, format_game_started, format_mention_response};
-use crate::riot::client::RiotClient;
+use crate::riot::client::RiotApiClient;
 use crate::riot::models::GameStateChange;
 use crate::riot::tracker::GameTracker;
 use serenity::async_trait;
@@ -10,20 +10,23 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, GuildId};
 use serenity::prelude::*;
-use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Duration;
 
 pub struct Bot {
-    pub db_pool: PgPool,
-    pub riot_client: Arc<RiotClient>,
+    pub repository: Arc<dyn Repository>,
+    pub riot_client: Arc<dyn RiotApiClient>,
     pub config: Config,
 }
 
 impl Bot {
-    pub fn new(db_pool: PgPool, riot_client: Arc<RiotClient>, config: Config) -> Self {
+    pub fn new(
+        repository: Arc<dyn Repository>,
+        riot_client: Arc<dyn RiotApiClient>,
+        config: Config,
+    ) -> Self {
         Self {
-            db_pool,
+            repository,
             riot_client,
             config,
         }
@@ -39,13 +42,13 @@ impl EventHandler for Bot {
     async fn cache_ready(&self, ctx: Context, _guilds: Vec<GuildId>) {
         tracing::info!("Cache ready, starting polling task");
 
-        let db_pool = self.db_pool.clone();
+        let repository = self.repository.clone();
         let riot_client = self.riot_client.clone();
         let config = self.config.clone();
         let ctx = ctx.clone();
 
         tokio::spawn(async move {
-            start_polling_task(ctx, db_pool, riot_client, config).await;
+            start_polling_task(ctx, repository, riot_client, config).await;
         });
     }
 
@@ -70,11 +73,11 @@ impl EventHandler for Bot {
 
 async fn start_polling_task(
     ctx: Context,
-    db_pool: PgPool,
-    riot_client: Arc<RiotClient>,
+    repository: Arc<dyn Repository>,
+    riot_client: Arc<dyn RiotApiClient>,
     config: Config,
 ) {
-    let tracker = GameTracker::new(riot_client, db_pool.clone(), config.default_region.clone());
+    let tracker = GameTracker::new(riot_client, repository.clone(), config.default_region.clone());
     let channel_id = ChannelId::new(config.discord_channel_id);
     let interval_secs = config.polling_interval_secs;
 
@@ -86,7 +89,7 @@ async fn start_polling_task(
         }
         first_run = false;
 
-        let summoners = match repository::get_all_summoners(&db_pool).await {
+        let summoners = match repository.get_all_summoners().await {
             Ok(s) => s,
             Err(e) => {
                 tracing::error!("Failed to get summoners: {}", e);
@@ -109,9 +112,9 @@ async fn start_polling_task(
     }
 }
 
-async fn check_and_notify(
+async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
     ctx: &Context,
-    tracker: &GameTracker,
+    tracker: &GameTracker<R, D>,
     summoner: &Summoner,
     channel_id: ChannelId,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {

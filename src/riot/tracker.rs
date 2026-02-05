@@ -1,8 +1,7 @@
 use crate::db::models::{NewActiveGame, NewMatchResult, Summoner};
-use crate::db::repository;
-use crate::riot::client::RiotClient;
+use crate::db::repository::{Repository, RepositoryError};
+use crate::riot::client::{RiotApiClient, RiotClient, RiotClientError};
 use crate::riot::models::{ActiveGameInfo, GameStateChange, MatchResult};
-use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
@@ -10,22 +9,22 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum TrackerError {
     #[error("Database error: {0}")]
-    Database(#[from] sqlx::Error),
+    Database(#[from] RepositoryError),
     #[error("Riot API error: {0}")]
-    RiotApi(#[from] crate::riot::client::RiotClientError),
+    RiotApi(#[from] RiotClientError),
 }
 
-pub struct GameTracker {
-    riot_client: Arc<RiotClient>,
-    db_pool: PgPool,
+pub struct GameTracker<R: RiotApiClient + ?Sized, D: Repository + ?Sized> {
+    riot_client: Arc<R>,
+    repository: Arc<D>,
     default_region: String,
 }
 
-impl GameTracker {
-    pub fn new(riot_client: Arc<RiotClient>, db_pool: PgPool, default_region: String) -> Self {
+impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
+    pub fn new(riot_client: Arc<R>, repository: Arc<D>, default_region: String) -> Self {
         Self {
             riot_client,
-            db_pool,
+            repository,
             default_region,
         }
     }
@@ -44,8 +43,10 @@ impl GameTracker {
             .await?;
 
         // Get active games from database
-        let db_games =
-            repository::get_active_games_for_summoner(&self.db_pool, summoner.id).await?;
+        let db_games = self
+            .repository
+            .get_active_games_for_summoner(summoner.id)
+            .await?;
 
         match (current_game, db_games.first()) {
             // Started a new game (not in DB yet)
@@ -81,7 +82,7 @@ impl GameTracker {
             game_start_time: game_info.game_start_time,
         };
 
-        repository::insert_active_game(&self.db_pool, &new_game).await?;
+        self.repository.insert_active_game(&new_game).await?;
         Ok(())
     }
 
@@ -92,7 +93,8 @@ impl GameTracker {
         game_id: i64,
     ) -> Result<Option<MatchResult>, TrackerError> {
         // Delete from active games
-        repository::delete_active_game_by_summoner_and_game(&self.db_pool, summoner.id, game_id)
+        self.repository
+            .delete_active_game_by_summoner_and_game(summoner.id, game_id)
             .await?;
 
         // Try to fetch match result with retries
@@ -115,7 +117,7 @@ impl GameTracker {
             };
 
             // Ignore errors on insert (might be duplicate)
-            let _ = repository::insert_match_result(&self.db_pool, &new_match).await;
+            let _ = self.repository.insert_match_result(&new_match).await;
         }
 
         Ok(result)
@@ -149,10 +151,9 @@ impl GameTracker {
                     .riot_client
                     .get_match_result(&match_id, &summoner.riot_puuid, region)
                     .await?
+                    .filter(|r| r.game_id == game_id)
                 {
-                    if result.game_id == game_id {
-                        return Ok(Some(result));
-                    }
+                    return Ok(Some(result));
                 }
             }
 
