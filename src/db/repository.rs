@@ -206,34 +206,41 @@ impl Repository for PgRepository {
         Ok(())
     }
 
-    async fn insert_match_result(
-        &self,
-        result: &NewMatchResult,
-    ) -> Result<MatchHistory, RepositoryError> {
-        let match_history = sqlx::query_as::<_, MatchHistory>(
-            r#"
-            INSERT INTO match_history (summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, finished_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (summoner_id, match_id) DO NOTHING
-            RETURNING id, summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, finished_at, created_at
-            "#,
-        )
-        .bind(result.summoner_id)
-        .bind(&result.match_id)
-        .bind(result.game_id)
-        .bind(result.win)
-        .bind(result.kills)
-        .bind(result.deaths)
-        .bind(result.assists)
-        .bind(result.champion_id)
-        .bind(result.game_duration_secs)
-        .bind(&result.game_mode)
-        .bind(&result.role)
-        .bind(result.finished_at)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(match_history)
-    }
+     async fn insert_match_result(
+         &self,
+         result: &NewMatchResult,
+     ) -> Result<MatchHistory, RepositoryError> {
+         let match_history = sqlx::query_as::<_, MatchHistory>(
+             r#"
+             INSERT INTO match_history (summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, finished_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+             ON CONFLICT (summoner_id, match_id) DO NOTHING
+             RETURNING id, summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, finished_at, created_at
+             "#,
+         )
+         .bind(result.summoner_id)
+         .bind(&result.match_id)
+         .bind(result.game_id)
+         .bind(result.win)
+         .bind(result.kills)
+         .bind(result.deaths)
+         .bind(result.assists)
+         .bind(result.champion_id)
+         .bind(result.game_duration_secs)
+         .bind(&result.game_mode)
+         .bind(&result.role)
+         .bind(result.total_cs)
+         .bind(result.total_gold)
+         .bind(result.total_damage)
+         .bind(&result.enemy_champion_name)
+         .bind(result.enemy_cs)
+         .bind(result.enemy_gold)
+         .bind(result.enemy_damage)
+         .bind(result.finished_at)
+         .fetch_one(&self.pool)
+         .await?;
+         Ok(match_history)
+     }
 
     async fn upsert_champion(
         &self,
@@ -268,34 +275,41 @@ impl Repository for PgRepository {
         Ok(champion)
     }
 
-    async fn insert_notification_event(
-        &self,
-        event: &NewNotificationEvent,
-    ) -> Result<NotificationEvent, RepositoryError> {
-        let notification = sqlx::query_as::<_, NotificationEvent>(
-            r#"
-            INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, processed, created_at, processed_at
-            "#,
-        )
-        .bind(event.summoner_id)
-        .bind(&event.event_type)
-        .bind(event.game_id)
-        .bind(&event.match_id)
-        .bind(event.champion_id)
-        .bind(&event.champion_name)
-        .bind(&event.role)
-        .bind(event.win)
-        .bind(event.kills)
-        .bind(event.deaths)
-        .bind(event.assists)
-        .bind(event.game_duration_secs)
-        .bind(&event.game_mode)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(notification)
-    }
+     async fn insert_notification_event(
+         &self,
+         event: &NewNotificationEvent,
+     ) -> Result<NotificationEvent, RepositoryError> {
+         let notification = sqlx::query_as::<_, NotificationEvent>(
+             r#"
+             INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+             RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, processed, created_at, processed_at
+             "#,
+         )
+         .bind(event.summoner_id)
+         .bind(&event.event_type)
+         .bind(event.game_id)
+         .bind(&event.match_id)
+         .bind(event.champion_id)
+         .bind(&event.champion_name)
+         .bind(&event.role)
+         .bind(event.win)
+         .bind(event.kills)
+         .bind(event.deaths)
+         .bind(event.assists)
+         .bind(event.game_duration_secs)
+         .bind(&event.game_mode)
+         .bind(event.total_cs)
+         .bind(event.total_gold)
+         .bind(event.total_damage)
+         .bind(&event.enemy_champion_name)
+         .bind(event.enemy_cs)
+         .bind(event.enemy_gold)
+         .bind(event.enemy_damage)
+         .fetch_one(&self.pool)
+         .await?;
+         Ok(notification)
+     }
 
     async fn get_pending_notification_events(
         &self,
