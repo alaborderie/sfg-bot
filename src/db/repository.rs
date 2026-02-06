@@ -279,33 +279,33 @@ impl Repository for PgRepository {
         &self,
         event: &NewNotificationEvent,
     ) -> Result<NotificationEvent, RepositoryError> {
-        let notification = sqlx::query_as::<_, NotificationEvent>(
-             r#"
-             INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-             RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, processed, created_at, processed_at
-             "#,
-         )
-         .bind(event.summoner_id)
-         .bind(&event.event_type)
-         .bind(event.game_id)
-         .bind(&event.match_id)
-         .bind(event.champion_id)
-         .bind(&event.champion_name)
-         .bind(&event.role)
-         .bind(event.win)
-         .bind(event.kills)
-         .bind(event.deaths)
-         .bind(event.assists)
-         .bind(event.game_duration_secs)
-         .bind(&event.game_mode)
-         .bind(event.total_cs)
-         .bind(event.total_gold)
-         .bind(event.total_damage)
-         .bind(&event.enemy_champion_name)
-         .bind(event.enemy_cs)
-         .bind(event.enemy_gold)
-         .bind(event.enemy_damage)
+         let notification = sqlx::query_as::<_, NotificationEvent>(
+              r#"
+              INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+              RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, processed, created_at, processed_at
+              "#,
+          )
+          .bind(event.summoner_id)
+          .bind(&event.event_type)
+          .bind(event.game_id)
+          .bind(&event.match_id)
+          .bind(event.champion_id)
+          .bind(&event.champion_name)
+          .bind(&event.role)
+          .bind(event.win)
+          .bind(event.kills)
+          .bind(event.deaths)
+          .bind(event.assists)
+          .bind(event.game_duration_secs)
+          .bind(&event.game_mode)
+          .bind(event.total_cs)
+          .bind(event.total_gold)
+          .bind(event.total_damage)
+          .bind(&event.enemy_champion_name)
+          .bind(event.enemy_cs)
+          .bind(event.enemy_gold)
+          .bind(event.enemy_damage)
          .fetch_one(&self.pool)
          .await?;
         Ok(notification)
