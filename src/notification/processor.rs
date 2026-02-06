@@ -64,14 +64,14 @@ impl NotificationProcessor {
                 "GAME_STARTED" => {
                     game_started_groups
                         .entry(event.game_id)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(event);
                 }
                 "GAME_ENDED" => {
                     if let Some(ref match_id) = event.match_id {
                         game_ended_groups
                             .entry(match_id.clone())
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push(event);
                     }
                 }
