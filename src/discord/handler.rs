@@ -195,16 +195,22 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
 
             tracker.repository.insert_notification_event(&event).await?;
         }
-        GameStateChange::GameEnded { game_id } => {
+        GameStateChange::GameEnded {
+            game_id,
+            is_featured_mode,
+        } => {
             tracing::info!(
-                "Game ended for {}#{}: game_id={}",
+                "Game ended for {}#{}: game_id={}, featured_mode={}",
                 summoner.game_name,
                 summoner.tag_line,
-                game_id
+                game_id,
+                is_featured_mode
             );
 
             let summoner_clone = summoner.clone();
-            let tracker_result = tracker.handle_game_ended(summoner, game_id).await;
+            let tracker_result = tracker
+                .handle_game_ended(summoner, game_id, is_featured_mode)
+                .await;
 
             match tracker_result {
                 Ok(Some(match_result)) => {

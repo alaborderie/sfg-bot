@@ -68,12 +68,17 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
                 // Return GameEnded first, next poll will catch the new game
                 Ok(GameStateChange::GameEnded {
                     game_id: db_game.game_id,
+                    is_featured_mode: false,
                 })
             }
             // Game ended (was in DB, no longer in Spectator)
-            (None, Some(db_game)) => Ok(GameStateChange::GameEnded {
-                game_id: db_game.game_id,
-            }),
+            (None, Some(db_game)) => {
+                let is_featured = self.is_game_featured_mode(db_game);
+                Ok(GameStateChange::GameEnded {
+                    game_id: db_game.game_id,
+                    is_featured_mode: is_featured,
+                })
+            }
             // Still in same game or still not in game
             _ => Ok(GameStateChange::NoChange),
         }
@@ -102,6 +107,7 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
         &self,
         summoner: &Summoner,
         game_id: i64,
+        _is_featured_mode: bool,
     ) -> Result<Option<MatchResult>, TrackerError> {
         // Delete from active games
         self.repository
@@ -189,5 +195,20 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
             max_retries
         );
         Ok(None)
+    }
+
+    /// Check if a game is likely a featured mode (ARAM Mayhem, Arena)
+    /// Featured modes don't return from Spectator API, so detection is heuristic
+    /// If ARAM game and >5 min elapsed since start, likely featured mode
+    fn is_game_featured_mode(&self, db_game: &crate::db::models::ActiveGame) -> bool {
+        if db_game.game_mode.to_uppercase() != "ARAM" {
+            return false;
+        }
+
+        let elapsed = chrono::Utc::now()
+            .signed_duration_since(db_game.game_start_time)
+            .num_seconds();
+
+        elapsed > 300
     }
 }

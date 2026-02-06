@@ -72,14 +72,25 @@ pub fn format_grouped_game_ended(
         Colour::from_rgb(241, 196, 15) // Gold/Orange
     };
 
+    let is_featured_mode = game_mode.to_uppercase() == "ARAM";
+    let description = if is_featured_mode {
+        "ARAM Mayhem ended! (Featured game - may take longer to process) Check your stats."
+            .to_string()
+    } else {
+        format!("{} game ended! Check your stats.", game_mode)
+    };
+
+    let footer_text = if is_featured_mode {
+        format!("League of Legends · {} (Featured)", game_mode)
+    } else {
+        format!("League of Legends · {}", game_mode)
+    };
+
     let mut embed = CreateEmbed::new()
         .title(format!("{} Wins, {} Losses", wins, losses))
-        .description(format!("{} game ended! Check your stats.", game_mode))
+        .description(description)
         .colour(color)
-        .footer(CreateEmbedFooter::new(format!(
-            "League of Legends · {}",
-            game_mode
-        )))
+        .footer(CreateEmbedFooter::new(footer_text))
         .timestamp(Timestamp::now());
 
     for summoner in summoners {
