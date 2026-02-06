@@ -49,6 +49,7 @@ async-trait = "0.1"
 
 # Mocking (optional, for tests)
 mockall = { version = "0.13", optional = true }
+reqwest = { version = "0.13.1", features = ["json"] }
 
 [dev-dependencies]
 tokio-test = "0.4"

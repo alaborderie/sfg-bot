@@ -102,6 +102,7 @@ mod match_result {
             champion_id: 157,
             game_duration_secs: 1800,
             game_mode: "CLASSIC".to_string(),
+            role: "TOP".to_string(),
         };
         assert_eq!(result.match_id, "EUW1_12345");
         assert!(result.win);
@@ -120,6 +121,7 @@ mod match_result {
             champion_id: 157,
             game_duration_secs: 1500,
             game_mode: "CLASSIC".to_string(),
+            role: "MID".to_string(),
         };
         assert!(!result.win);
     }
@@ -136,6 +138,7 @@ mod match_result {
             champion_id: 1,
             game_duration_secs: 1000,
             game_mode: "CLASSIC".to_string(),
+            role: "JUNGLE".to_string(),
         };
         let cloned = result.clone();
         assert_eq!(result.match_id, cloned.match_id);
@@ -154,6 +157,7 @@ mod match_result {
             champion_id: 1,
             game_duration_secs: 900,
             game_mode: "CLASSIC".to_string(),
+            role: "SUPPORT".to_string(),
         };
         assert_eq!(result.kills, 0);
         assert_eq!(result.deaths, 0);
@@ -269,6 +273,7 @@ mod new_match_result {
             champion_id: 157,
             game_duration_secs: 1800,
             game_mode: "CLASSIC".to_string(),
+            role: "TOP".to_string(),
             finished_at: Utc::now(),
         };
         assert!(result.win);
@@ -288,6 +293,7 @@ mod new_match_result {
             champion_id: 1,
             game_duration_secs: 1000,
             game_mode: "CLASSIC".to_string(),
+            role: "MID".to_string(),
             finished_at: Utc::now(),
         };
         let cloned = result.clone();

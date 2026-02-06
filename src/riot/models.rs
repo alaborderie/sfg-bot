@@ -29,6 +29,7 @@ pub struct MatchResult {
     pub champion_id: i32,
     pub game_duration_secs: i32,
     pub game_mode: String,
+    pub role: String,
 }
 
 /// Represents a change in game state for a summoner

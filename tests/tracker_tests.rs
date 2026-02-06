@@ -53,6 +53,7 @@ fn create_test_match_result(game_id: i64) -> MatchResult {
         champion_id: 1,
         game_duration_secs: 1800,
         game_mode: "CLASSIC".to_string(),
+        role: "JUNGLE".to_string(),
     }
 }
 
@@ -69,11 +70,11 @@ fn create_test_match_history(summoner_id: Uuid, game_id: i64) -> MatchHistory {
         champion_id: 1,
         game_duration_secs: 1800,
         game_mode: "CLASSIC".to_string(),
+        role: Some("JUNGLE".to_string()),
         finished_at: Utc::now(),
         created_at: Utc::now(),
     }
 }
-
 mod check_summoner_game_state {
     use super::*;
 

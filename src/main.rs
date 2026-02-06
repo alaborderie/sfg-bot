@@ -42,14 +42,39 @@ async fn main() {
         .expect("Failed to run database migrations");
     tracing::info!("Database migrations complete");
 
-    // Create Riot API client
     let riot_client: Arc<dyn RiotApiClient> = Arc::new(RiotClient::new(&config.riot_api_key));
     tracing::info!("Riot API client initialized");
 
-    // Create repository
     let repository = Arc::new(PgRepository::new(db_pool.clone()));
 
-    // Resolve summoner PUUIDs and upsert to database
+    tracing::info!("Fetching champion data from Data Dragon...");
+    match riot_client.get_all_champions().await {
+        Ok(champions) => {
+            tracing::info!(
+                "Fetched {} champions, upserting to database...",
+                champions.len()
+            );
+            let mut success_count = 0;
+            for (champion_id, champion_name) in champions {
+                if let Err(e) = repository
+                    .upsert_champion(champion_id, &champion_name)
+                    .await
+                {
+                    tracing::error!("Failed to upsert champion {}: {}", champion_name, e);
+                } else {
+                    success_count += 1;
+                }
+            }
+            tracing::info!("Successfully cached {} champions", success_count);
+        }
+        Err(e) => {
+            tracing::warn!(
+                "Failed to fetch champion data: {}. Champion names will fall back to IDs.",
+                e
+            );
+        }
+    }
+
     for summoner_config in &config.summoner_names {
         match riot_client
             .get_account_by_riot_id(

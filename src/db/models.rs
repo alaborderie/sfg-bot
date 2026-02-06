@@ -46,6 +46,7 @@ pub struct MatchHistory {
     pub champion_id: i32,
     pub game_duration_secs: i32,
     pub game_mode: String,
+    pub role: Option<String>,
     pub finished_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
 }
@@ -62,5 +63,14 @@ pub struct NewMatchResult {
     pub champion_id: i32,
     pub game_duration_secs: i32,
     pub game_mode: String,
+    pub role: String,
     pub finished_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct Champion {
+    pub id: Uuid,
+    pub champion_id: i32,
+    pub champion_name: String,
+    pub created_at: DateTime<Utc>,
 }

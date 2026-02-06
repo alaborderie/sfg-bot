@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
 use riven::RiotApi;
 use riven::consts::{PlatformRoute, RegionalRoute};
+use serde::Deserialize;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -13,6 +14,10 @@ pub enum RiotClientError {
     AccountNotFound(String, String),
     #[error("Unknown region: {0}")]
     UnknownRegion(String),
+    #[error("HTTP error: {0}")]
+    HttpError(#[from] reqwest::Error),
+    #[error("JSON parse error: {0}")]
+    JsonError(#[from] serde_json::Error),
 }
 
 #[cfg_attr(feature = "test-mocks", mockall::automock)]
@@ -37,6 +42,10 @@ pub trait RiotApiClient: Send + Sync {
         puuid: &str,
         region: RegionalRoute,
     ) -> Result<Option<MatchResult>, RiotClientError>;
+
+    async fn get_all_champions(
+        &self,
+    ) -> Result<std::collections::HashMap<i32, String>, RiotClientError>;
 }
 
 pub struct RiotClient {
@@ -161,7 +170,40 @@ impl RiotApiClient for RiotClient {
                 champion_id: participant.champion().map(|c| c.0 as i32).unwrap_or(0),
                 game_duration_secs: m.info.game_duration as i32,
                 game_mode: m.info.game_mode.to_string(),
+                role: participant.team_position.clone(),
             })
         }))
+    }
+
+    async fn get_all_champions(
+        &self,
+    ) -> Result<std::collections::HashMap<i32, String>, RiotClientError> {
+        #[derive(Deserialize)]
+        struct ChampionData {
+            key: String, // This is the champion_id as a string
+            name: String,
+        }
+
+        #[derive(Deserialize)]
+        struct ChampionsResponse {
+            data: std::collections::HashMap<String, ChampionData>,
+        }
+
+        let client = reqwest::Client::new();
+        let response = client
+            .get("https://ddragon.leagueoflegends.com/cdn/14.1.1/data/en_US/champion.json")
+            .send()
+            .await?;
+
+        let champions: ChampionsResponse = response.json().await?;
+
+        let mut result = std::collections::HashMap::new();
+        for champion_data in champions.data.values() {
+            if let Ok(champion_id) = champion_data.key.parse::<i32>() {
+                result.insert(champion_id, champion_data.name.clone());
+            }
+        }
+
+        Ok(result)
     }
 }

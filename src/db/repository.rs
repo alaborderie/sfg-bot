@@ -1,4 +1,6 @@
-use crate::db::models::{ActiveGame, MatchHistory, NewActiveGame, NewMatchResult, Summoner};
+use crate::db::models::{
+    ActiveGame, Champion, MatchHistory, NewActiveGame, NewMatchResult, Summoner,
+};
 use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -51,6 +53,17 @@ pub trait Repository: Send + Sync {
         &self,
         result: &NewMatchResult,
     ) -> Result<MatchHistory, RepositoryError>;
+
+    async fn upsert_champion(
+        &self,
+        champion_id: i32,
+        champion_name: &str,
+    ) -> Result<Champion, RepositoryError>;
+
+    async fn get_champion_by_id(
+        &self,
+        champion_id: i32,
+    ) -> Result<Option<Champion>, RepositoryError>;
 }
 
 pub struct PgRepository {
@@ -186,10 +199,10 @@ impl Repository for PgRepository {
     ) -> Result<MatchHistory, RepositoryError> {
         let match_history = sqlx::query_as::<_, MatchHistory>(
             r#"
-            INSERT INTO match_history (summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, finished_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            INSERT INTO match_history (summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, finished_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             ON CONFLICT (summoner_id, match_id) DO NOTHING
-            RETURNING id, summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, finished_at, created_at
+            RETURNING id, summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, finished_at, created_at
             "#,
         )
         .bind(result.summoner_id)
@@ -202,9 +215,43 @@ impl Repository for PgRepository {
         .bind(result.champion_id)
         .bind(result.game_duration_secs)
         .bind(&result.game_mode)
+        .bind(&result.role)
         .bind(result.finished_at)
         .fetch_one(&self.pool)
         .await?;
         Ok(match_history)
+    }
+
+    async fn upsert_champion(
+        &self,
+        champion_id: i32,
+        champion_name: &str,
+    ) -> Result<Champion, RepositoryError> {
+        let champion = sqlx::query_as::<_, Champion>(
+            r#"
+            INSERT INTO champions (champion_id, champion_name)
+            VALUES ($1, $2)
+            ON CONFLICT (champion_id) DO UPDATE SET
+                champion_name = EXCLUDED.champion_name
+            RETURNING id, champion_id, champion_name, created_at
+            "#,
+        )
+        .bind(champion_id)
+        .bind(champion_name)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(champion)
+    }
+
+    async fn get_champion_by_id(
+        &self,
+        champion_id: i32,
+    ) -> Result<Option<Champion>, RepositoryError> {
+        let champion =
+            sqlx::query_as::<_, Champion>("SELECT * FROM champions WHERE champion_id = $1")
+                .bind(champion_id)
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(champion)
     }
 }

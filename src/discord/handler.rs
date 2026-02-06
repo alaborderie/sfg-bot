@@ -152,9 +152,16 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
 
             tracker.handle_game_started(summoner, &game_info).await?;
 
+            let champion_name = tracker
+                .repository
+                .get_champion_by_id(game_info.champion_id)
+                .await?
+                .map(|c| c.champion_name)
+                .unwrap_or_else(|| format!("Champion #{}", game_info.champion_id));
+
             let msg = format_game_started(
                 &format!("{}#{}", summoner.game_name, summoner.tag_line),
-                game_info.champion_id,
+                &champion_name,
                 &game_info.game_mode,
             );
             channel_id.say(&ctx.http, &msg).await?;
@@ -179,6 +186,7 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
                         match_result.deaths,
                         match_result.assists,
                         match_result.game_duration_secs,
+                        Some(&match_result.role),
                     );
                     channel_id.say(&ctx.http, &msg).await?;
                 }

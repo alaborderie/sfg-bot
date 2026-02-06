@@ -16,7 +16,7 @@ pub enum TrackerError {
 
 pub struct GameTracker<R: RiotApiClient + ?Sized, D: Repository + ?Sized> {
     riot_client: Arc<R>,
-    repository: Arc<D>,
+    pub repository: Arc<D>,
     default_region: String,
 }
 
@@ -124,6 +124,7 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
                 champion_id: match_result.champion_id,
                 game_duration_secs: match_result.game_duration_secs,
                 game_mode: match_result.game_mode.clone(),
+                role: match_result.role.clone(),
                 finished_at: chrono::Utc::now(),
             };
 

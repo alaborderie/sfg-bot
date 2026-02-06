@@ -1,0 +1,1 @@
+ALTER TABLE match_history ADD COLUMN role VARCHAR(20);
