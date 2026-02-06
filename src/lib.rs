@@ -1,6 +1,7 @@
 pub mod config;
 pub mod db;
 pub mod discord;
+pub mod notification;
 pub mod riot;
 
 pub use config::{Config, ConfigError, SummonerConfig, parse_summoner_names};

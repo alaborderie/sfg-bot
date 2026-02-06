@@ -74,3 +74,41 @@ pub struct Champion {
     pub champion_name: String,
     pub created_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, FromRow)]
+pub struct NotificationEvent {
+    pub id: Uuid,
+    pub summoner_id: Uuid,
+    pub event_type: String,
+    pub game_id: i64,
+    pub match_id: Option<String>,
+    pub champion_id: i32,
+    pub champion_name: String,
+    pub role: Option<String>,
+    pub win: Option<bool>,
+    pub kills: Option<i32>,
+    pub deaths: Option<i32>,
+    pub assists: Option<i32>,
+    pub game_duration_secs: Option<i32>,
+    pub game_mode: String,
+    pub processed: bool,
+    pub created_at: DateTime<Utc>,
+    pub processed_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewNotificationEvent {
+    pub summoner_id: Uuid,
+    pub event_type: String,
+    pub game_id: i64,
+    pub match_id: Option<String>,
+    pub champion_id: i32,
+    pub champion_name: String,
+    pub role: Option<String>,
+    pub win: Option<bool>,
+    pub kills: Option<i32>,
+    pub deaths: Option<i32>,
+    pub assists: Option<i32>,
+    pub game_duration_secs: Option<i32>,
+    pub game_mode: String,
+}

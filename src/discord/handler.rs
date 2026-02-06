@@ -1,7 +1,8 @@
 use crate::config::Config;
-use crate::db::models::Summoner;
+use crate::db::models::{NewNotificationEvent, Summoner};
 use crate::db::repository::Repository;
-use crate::discord::messages::{format_game_ended, format_game_started, format_mention_response};
+use crate::discord::messages::format_mention_response;
+use crate::notification::NotificationProcessor;
 use crate::riot::client::RiotApiClient;
 use crate::riot::models::GameStateChange;
 use crate::riot::tracker::GameTracker;
@@ -40,15 +41,25 @@ impl EventHandler for Bot {
     }
 
     async fn cache_ready(&self, ctx: Context, _guilds: Vec<GuildId>) {
-        tracing::info!("Cache ready, starting polling task");
+        tracing::info!("Cache ready, starting background tasks");
 
         let repository = self.repository.clone();
         let riot_client = self.riot_client.clone();
         let config = self.config.clone();
-        let ctx = ctx.clone();
+        let ctx_clone = ctx.clone();
 
         tokio::spawn(async move {
-            start_polling_task(ctx, repository, riot_client, config).await;
+            start_polling_task(ctx_clone, repository, riot_client, config).await;
+        });
+
+        let repository = self.repository.clone();
+        let config = self.config.clone();
+        let ctx_clone = ctx.clone();
+
+        tokio::spawn(async move {
+            let channel_id = ChannelId::new(config.discord_channel_id);
+            let processor = NotificationProcessor::new(repository, ctx_clone, channel_id, 5);
+            processor.start().await;
         });
     }
 
@@ -134,10 +145,10 @@ async fn start_polling_task(
 }
 
 async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
-    ctx: &Context,
+    _ctx: &Context,
     tracker: &GameTracker<R, D>,
     summoner: &Summoner,
-    channel_id: ChannelId,
+    _channel_id: ChannelId,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_change = tracker.check_summoner_game_state(summoner).await?;
 
@@ -159,12 +170,23 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
                 .map(|c| c.champion_name)
                 .unwrap_or_else(|| format!("Champion #{}", game_info.champion_id));
 
-            let msg = format_game_started(
-                &format!("{}#{}", summoner.game_name, summoner.tag_line),
-                &champion_name,
-                &game_info.game_mode,
-            );
-            channel_id.say(&ctx.http, &msg).await?;
+            let event = NewNotificationEvent {
+                summoner_id: summoner.id,
+                event_type: "GAME_STARTED".to_string(),
+                game_id: game_info.game_id,
+                match_id: None,
+                champion_id: game_info.champion_id,
+                champion_name,
+                role: None,
+                win: None,
+                kills: None,
+                deaths: None,
+                assists: None,
+                game_duration_secs: None,
+                game_mode: game_info.game_mode,
+            };
+
+            tracker.repository.insert_notification_event(&event).await?;
         }
         GameStateChange::GameEnded { game_id } => {
             tracing::info!(
@@ -179,16 +201,30 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
 
             match tracker_result {
                 Ok(Some(match_result)) => {
-                    let msg = format_game_ended(
-                        &format!("{}#{}", summoner_clone.game_name, summoner_clone.tag_line),
-                        match_result.win,
-                        match_result.kills,
-                        match_result.deaths,
-                        match_result.assists,
-                        match_result.game_duration_secs,
-                        Some(&match_result.role),
-                    );
-                    channel_id.say(&ctx.http, &msg).await?;
+                    let champion_name = tracker
+                        .repository
+                        .get_champion_by_id(match_result.champion_id)
+                        .await?
+                        .map(|c| c.champion_name)
+                        .unwrap_or_else(|| format!("Champion #{}", match_result.champion_id));
+
+                    let event = NewNotificationEvent {
+                        summoner_id: summoner_clone.id,
+                        event_type: "GAME_ENDED".to_string(),
+                        game_id: match_result.game_id,
+                        match_id: Some(match_result.match_id),
+                        champion_id: match_result.champion_id,
+                        champion_name,
+                        role: Some(match_result.role),
+                        win: Some(match_result.win),
+                        kills: Some(match_result.kills),
+                        deaths: Some(match_result.deaths),
+                        assists: Some(match_result.assists),
+                        game_duration_secs: Some(match_result.game_duration_secs),
+                        game_mode: match_result.game_mode,
+                    };
+
+                    tracker.repository.insert_notification_event(&event).await?;
                 }
                 Ok(None) => {
                     tracing::warn!(

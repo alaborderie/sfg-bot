@@ -1,5 +1,6 @@
 use crate::db::models::{
-    ActiveGame, Champion, MatchHistory, NewActiveGame, NewMatchResult, Summoner,
+    ActiveGame, Champion, MatchHistory, NewActiveGame, NewMatchResult, NewNotificationEvent,
+    NotificationEvent, Summoner,
 };
 use async_trait::async_trait;
 use sqlx::PgPool;
@@ -64,6 +65,20 @@ pub trait Repository: Send + Sync {
         &self,
         champion_id: i32,
     ) -> Result<Option<Champion>, RepositoryError>;
+
+    async fn insert_notification_event(
+        &self,
+        event: &NewNotificationEvent,
+    ) -> Result<NotificationEvent, RepositoryError>;
+
+    async fn get_pending_notification_events(
+        &self,
+    ) -> Result<Vec<NotificationEvent>, RepositoryError>;
+
+    async fn mark_notifications_processed(
+        &self,
+        event_ids: &[Uuid],
+    ) -> Result<(), RepositoryError>;
 }
 
 pub struct PgRepository {
@@ -253,5 +268,58 @@ impl Repository for PgRepository {
                 .fetch_optional(&self.pool)
                 .await?;
         Ok(champion)
+    }
+
+    async fn insert_notification_event(
+        &self,
+        event: &NewNotificationEvent,
+    ) -> Result<NotificationEvent, RepositoryError> {
+        let notification = sqlx::query_as::<_, NotificationEvent>(
+            r#"
+            INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, processed, created_at, processed_at
+            "#,
+        )
+        .bind(event.summoner_id)
+        .bind(&event.event_type)
+        .bind(event.game_id)
+        .bind(&event.match_id)
+        .bind(event.champion_id)
+        .bind(&event.champion_name)
+        .bind(&event.role)
+        .bind(event.win)
+        .bind(event.kills)
+        .bind(event.deaths)
+        .bind(event.assists)
+        .bind(event.game_duration_secs)
+        .bind(&event.game_mode)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(notification)
+    }
+
+    async fn get_pending_notification_events(
+        &self,
+    ) -> Result<Vec<NotificationEvent>, RepositoryError> {
+        let events = sqlx::query_as::<_, NotificationEvent>(
+            "SELECT * FROM notification_queue WHERE processed = false ORDER BY created_at ASC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(events)
+    }
+
+    async fn mark_notifications_processed(
+        &self,
+        event_ids: &[Uuid],
+    ) -> Result<(), RepositoryError> {
+        sqlx::query(
+            "UPDATE notification_queue SET processed = true, processed_at = NOW() WHERE id = ANY($1)",
+        )
+        .bind(event_ids)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 }
