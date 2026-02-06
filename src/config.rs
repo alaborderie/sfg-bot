@@ -32,7 +32,10 @@ pub enum ConfigError {
 
 impl Config {
     pub fn from_env() -> Self {
-        dotenvy::dotenv().ok();
+        match dotenvy::dotenv() {
+            Ok(path) => tracing::debug!("Loaded .env from: {:?}", path),
+            Err(e) => tracing::warn!("Could not load .env: {}", e),
+        }
 
         let riot_api_key = env::var("RIOT_API_KEY").expect("RIOT_API_KEY must be set");
         let discord_bot_token =
