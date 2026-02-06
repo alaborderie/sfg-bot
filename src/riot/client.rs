@@ -168,7 +168,9 @@ impl RiotApiClient for RiotClient {
                     && p.puuid != puuid
             };
 
-            let enemy_data = m.info.participants
+            let enemy_data = m
+                .info
+                .participants
                 .iter()
                 .find(is_same_role_different_team)
                 .map(|enemy| {

@@ -206,11 +206,11 @@ impl Repository for PgRepository {
         Ok(())
     }
 
-     async fn insert_match_result(
-         &self,
-         result: &NewMatchResult,
-     ) -> Result<MatchHistory, RepositoryError> {
-         let match_history = sqlx::query_as::<_, MatchHistory>(
+    async fn insert_match_result(
+        &self,
+        result: &NewMatchResult,
+    ) -> Result<MatchHistory, RepositoryError> {
+        let match_history = sqlx::query_as::<_, MatchHistory>(
              r#"
              INSERT INTO match_history (summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, finished_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
@@ -239,8 +239,8 @@ impl Repository for PgRepository {
          .bind(result.finished_at)
          .fetch_one(&self.pool)
          .await?;
-         Ok(match_history)
-     }
+        Ok(match_history)
+    }
 
     async fn upsert_champion(
         &self,
@@ -275,11 +275,11 @@ impl Repository for PgRepository {
         Ok(champion)
     }
 
-     async fn insert_notification_event(
-         &self,
-         event: &NewNotificationEvent,
-     ) -> Result<NotificationEvent, RepositoryError> {
-         let notification = sqlx::query_as::<_, NotificationEvent>(
+    async fn insert_notification_event(
+        &self,
+        event: &NewNotificationEvent,
+    ) -> Result<NotificationEvent, RepositoryError> {
+        let notification = sqlx::query_as::<_, NotificationEvent>(
              r#"
              INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
@@ -308,8 +308,8 @@ impl Repository for PgRepository {
          .bind(event.enemy_damage)
          .fetch_one(&self.pool)
          .await?;
-         Ok(notification)
-     }
+        Ok(notification)
+    }
 
     async fn get_pending_notification_events(
         &self,
