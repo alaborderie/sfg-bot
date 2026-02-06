@@ -48,6 +48,7 @@ pub fn format_grouped_game_started(
 pub fn format_grouped_game_ended(
     summoners: &[Summoner],
     events: &[NotificationEvent],
+    game_mode: &str,
 ) -> CreateEmbed {
     let event_map: HashMap<Uuid, &NotificationEvent> =
         events.iter().map(|e| (e.summoner_id, e)).collect();
@@ -73,9 +74,12 @@ pub fn format_grouped_game_ended(
 
     let mut embed = CreateEmbed::new()
         .title(format!("{} Wins, {} Losses", wins, losses))
-        .description("Game ended! Check your stats.")
+        .description(format!("{} game ended! Check your stats.", game_mode))
         .colour(color)
-        .footer(CreateEmbedFooter::new("Match results saved to history"))
+        .footer(CreateEmbedFooter::new(format!(
+            "League of Legends · {}",
+            game_mode
+        )))
         .timestamp(Timestamp::now());
 
     for summoner in summoners {
@@ -174,7 +178,7 @@ fn format_enemy_comparison(
     match (enemy_champion, enemy_cs, enemy_gold, enemy_damage) {
         (Some(champ), Some(cs), Some(gold), Some(dmg)) => {
             let stats = format_stats_line(cs, gold, dmg, game_duration_secs);
-            format!("⚔️ vs {} ({})", champ, stats)
+            format!("{} ({})", champ, stats)
         }
         _ => "⚔️ vs Unknown (no role data)".to_string(),
     }

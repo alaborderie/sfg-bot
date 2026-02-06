@@ -144,7 +144,11 @@ impl NotificationProcessor {
 
         let summoners = self.fetch_summoners(&summoner_ids).await?;
 
-        let embed = format_grouped_game_ended(&summoners, &events);
+        let game_mode = events
+            .first()
+            .map(|e| e.game_mode.as_str())
+            .unwrap_or("UNKNOWN");
+        let embed = format_grouped_game_ended(&summoners, &events, game_mode);
         let builder = CreateMessage::new().embed(embed);
 
         self.channel_id
