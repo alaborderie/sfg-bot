@@ -42,6 +42,17 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
             .get_active_game(&summoner.riot_puuid, platform)
             .await?;
 
+        tracing::info!(
+            "Current game for {}#{}: {}",
+            summoner.game_name,
+            summoner.tag_line,
+            if current_game.is_some() {
+                "In Game"
+            } else {
+                "Not In Game"
+            }
+        );
+
         // Get active games from database
         let db_games = self
             .repository
@@ -98,7 +109,7 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
             .await?;
 
         // Try to fetch match result with retries
-        let result = self.fetch_match_with_retry(summoner, game_id, 3).await?;
+        let result = self.fetch_match_with_retry(summoner, game_id, 6).await?;
 
         // If we got a result, save it to match_history
         if let Some(ref match_result) = result {
@@ -131,43 +142,42 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
         max_retries: u32,
     ) -> Result<Option<MatchResult>, TrackerError> {
         let region = RiotClient::regional_for_region(&self.default_region);
+        let platform = RiotClient::platform_for_region(&self.default_region);
+        let match_id = format!("{}_{}", platform, game_id);
 
-        // Get recent matches and find the one matching our game_id
+        tracing::info!(
+            "Looking up match {} for {}#{}",
+            match_id,
+            summoner.game_name,
+            summoner.tag_line
+        );
+
         for attempt in 0..max_retries {
             if attempt > 0 {
-                // Wait 5 minutes between retries
-                tokio::time::sleep(Duration::from_secs(300)).await;
+                // Wait 10 seconds between retries
+                tokio::time::sleep(Duration::from_secs(10)).await;
             }
 
-            // Get recent match IDs
-            let match_ids = self
+            match self
                 .riot_client
-                .get_recent_match_ids(&summoner.riot_puuid, region, 5)
-                .await?;
-
-            // Try to find the match with our game_id
-            for match_id in match_ids {
-                if let Some(result) = self
-                    .riot_client
-                    .get_match_result(&match_id, &summoner.riot_puuid, region)
-                    .await?
-                    .filter(|r| r.game_id == game_id)
-                {
-                    return Ok(Some(result));
+                .get_match_result(&match_id, &summoner.riot_puuid, region)
+                .await?
+            {
+                Some(result) => return Ok(Some(result)),
+                None => {
+                    tracing::debug!(
+                        "Match {} not yet available (attempt {}/{})",
+                        match_id,
+                        attempt + 1,
+                        max_retries
+                    );
                 }
             }
-
-            tracing::debug!(
-                "Match data not yet available for game {} (attempt {}/{})",
-                game_id,
-                attempt + 1,
-                max_retries
-            );
         }
 
         tracing::warn!(
-            "Could not find match data for game {} after {} retries",
-            game_id,
+            "Could not find match data for {} after {} retries",
+            match_id,
             max_retries
         );
         Ok(None)

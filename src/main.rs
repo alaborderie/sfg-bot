@@ -95,7 +95,8 @@ async fn main() {
     }
 
     // Set up Discord client with required intents
-    let intents = GatewayIntents::GUILD_MESSAGES
+    let intents = GatewayIntents::GUILDS
+        | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
 

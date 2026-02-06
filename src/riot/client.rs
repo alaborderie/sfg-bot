@@ -37,13 +37,6 @@ pub trait RiotApiClient: Send + Sync {
         puuid: &str,
         region: RegionalRoute,
     ) -> Result<Option<MatchResult>, RiotClientError>;
-
-    async fn get_recent_match_ids(
-        &self,
-        puuid: &str,
-        region: RegionalRoute,
-        count: i32,
-    ) -> Result<Vec<String>, RiotClientError>;
 }
 
 pub struct RiotClient {
@@ -170,19 +163,5 @@ impl RiotApiClient for RiotClient {
                 game_mode: m.info.game_mode.to_string(),
             })
         }))
-    }
-
-    async fn get_recent_match_ids(
-        &self,
-        puuid: &str,
-        region: RegionalRoute,
-        count: i32,
-    ) -> Result<Vec<String>, RiotClientError> {
-        let matches = self
-            .api
-            .match_v5()
-            .get_match_ids_by_puuid(region, puuid, Some(count), None, None, None, None, None)
-            .await?;
-        Ok(matches)
     }
 }

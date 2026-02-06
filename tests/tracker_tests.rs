@@ -334,11 +334,8 @@ mod handle_game_ended {
 
         let mut mock_riot = MockRiotApiClient::new();
         mock_riot
-            .expect_get_recent_match_ids()
-            .times(1)
-            .returning(|_, _, _| Ok(vec!["NA1_12345".to_string()]));
-        mock_riot
             .expect_get_match_result()
+            .withf(|match_id, _, _| match_id == "NA1_12345")
             .times(1)
             .returning(move |_, _, _| Ok(Some(create_test_match_result(12345))));
 
@@ -375,13 +372,10 @@ mod handle_game_ended {
 
         let mut mock_riot = MockRiotApiClient::new();
         mock_riot
-            .expect_get_recent_match_ids()
-            .times(3)
-            .returning(|_, _, _| Ok(vec!["NA1_99999".to_string()]));
-        mock_riot
             .expect_get_match_result()
-            .times(3)
-            .returning(|_, _, _| Ok(Some(create_test_match_result(99999))));
+            .withf(|match_id, _, _| match_id == "NA1_12345")
+            .times(6)
+            .returning(|_, _, _| Ok(None));
 
         let mut mock_repo = MockRepository::new();
         mock_repo
@@ -424,11 +418,8 @@ mod handle_game_ended {
 
         let mut mock_riot = MockRiotApiClient::new();
         mock_riot
-            .expect_get_recent_match_ids()
-            .times(1)
-            .returning(|_, _, _| Ok(vec!["NA1_12345".to_string()]));
-        mock_riot
             .expect_get_match_result()
+            .withf(|match_id, _, _| match_id == "NA1_12345")
             .times(1)
             .returning(move |_, _, _| Ok(Some(create_test_match_result(12345))));
 
