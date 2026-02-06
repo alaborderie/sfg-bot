@@ -160,6 +160,32 @@ impl RiotApiClient for RiotClient {
         Ok(match_data.and_then(|m| {
             let participant = m.info.participants.iter().find(|p| p.puuid == puuid)?;
 
+            let total_cs = participant.total_minions_killed + participant.neutral_minions_killed;
+
+            let is_same_role_different_team = |p: &&riven::models::match_v5::Participant| {
+                p.team_position == participant.team_position
+                    && p.team_id != participant.team_id
+                    && p.puuid != puuid
+            };
+
+            let enemy_data = m.info.participants
+                .iter()
+                .find(is_same_role_different_team)
+                .map(|enemy| {
+                    let enemy_cs = enemy.total_minions_killed + enemy.neutral_minions_killed;
+                    (
+                        enemy.champion_name.clone(),
+                        enemy_cs,
+                        enemy.gold_earned,
+                        enemy.total_damage_dealt_to_champions,
+                    )
+                });
+
+            let (enemy_champion_name, enemy_cs, enemy_gold, enemy_damage) = match enemy_data {
+                Some((name, cs, gold, dmg)) => (Some(name), Some(cs), Some(gold), Some(dmg)),
+                None => (None, None, None, None),
+            };
+
             Some(MatchResult {
                 match_id: m.metadata.match_id,
                 game_id: m.info.game_id,
@@ -171,6 +197,13 @@ impl RiotApiClient for RiotClient {
                 game_duration_secs: m.info.game_duration as i32,
                 game_mode: m.info.game_mode.to_string(),
                 role: participant.team_position.clone(),
+                total_cs,
+                total_gold: participant.gold_earned,
+                total_damage: participant.total_damage_dealt_to_champions,
+                enemy_champion_name,
+                enemy_cs,
+                enemy_gold,
+                enemy_damage,
             })
         }))
     }
