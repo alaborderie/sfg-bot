@@ -103,6 +103,13 @@ mod match_result {
             game_duration_secs: 1800,
             game_mode: "CLASSIC".to_string(),
             role: "TOP".to_string(),
+            total_cs: 200,
+            total_gold: 15000,
+            total_damage: 25000,
+            enemy_champion_name: Some("Darius".to_string()),
+            enemy_cs: Some(180),
+            enemy_gold: Some(14000),
+            enemy_damage: Some(22000),
         };
         assert_eq!(result.match_id, "EUW1_12345");
         assert!(result.win);
@@ -122,6 +129,13 @@ mod match_result {
             game_duration_secs: 1500,
             game_mode: "CLASSIC".to_string(),
             role: "MID".to_string(),
+            total_cs: 150,
+            total_gold: 10000,
+            total_damage: 18000,
+            enemy_champion_name: Some("Zed".to_string()),
+            enemy_cs: Some(180),
+            enemy_gold: Some(13000),
+            enemy_damage: Some(24000),
         };
         assert!(!result.win);
     }
@@ -139,6 +153,13 @@ mod match_result {
             game_duration_secs: 1000,
             game_mode: "CLASSIC".to_string(),
             role: "JUNGLE".to_string(),
+            total_cs: 100,
+            total_gold: 8000,
+            total_damage: 15000,
+            enemy_champion_name: None,
+            enemy_cs: None,
+            enemy_gold: None,
+            enemy_damage: None,
         };
         let cloned = result.clone();
         assert_eq!(result.match_id, cloned.match_id);
@@ -158,6 +179,13 @@ mod match_result {
             game_duration_secs: 900,
             game_mode: "CLASSIC".to_string(),
             role: "SUPPORT".to_string(),
+            total_cs: 50,
+            total_gold: 5000,
+            total_damage: 8000,
+            enemy_champion_name: None,
+            enemy_cs: None,
+            enemy_gold: None,
+            enemy_damage: None,
         };
         assert_eq!(result.kills, 0);
         assert_eq!(result.deaths, 0);
@@ -275,6 +303,13 @@ mod new_match_result {
             game_mode: "CLASSIC".to_string(),
             role: "TOP".to_string(),
             finished_at: Utc::now(),
+            total_cs: 200,
+            total_gold: 15000,
+            total_damage: 25000,
+            enemy_champion_name: Some("Darius".to_string()),
+            enemy_cs: Some(180),
+            enemy_gold: Some(14000),
+            enemy_damage: Some(22000),
         };
         assert!(result.win);
         assert_eq!(result.kills, 10);
@@ -295,6 +330,13 @@ mod new_match_result {
             game_mode: "CLASSIC".to_string(),
             role: "MID".to_string(),
             finished_at: Utc::now(),
+            total_cs: 100,
+            total_gold: 8000,
+            total_damage: 15000,
+            enemy_champion_name: None,
+            enemy_cs: None,
+            enemy_gold: None,
+            enemy_damage: None,
         };
         let cloned = result.clone();
         assert_eq!(result.match_id, cloned.match_id);

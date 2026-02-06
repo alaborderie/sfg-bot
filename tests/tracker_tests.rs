@@ -54,6 +54,13 @@ fn create_test_match_result(game_id: i64) -> MatchResult {
         game_duration_secs: 1800,
         game_mode: "CLASSIC".to_string(),
         role: "JUNGLE".to_string(),
+        total_cs: 180,
+        total_gold: 13500,
+        total_damage: 20000,
+        enemy_champion_name: Some("Lee Sin".to_string()),
+        enemy_cs: Some(170),
+        enemy_gold: Some(12000),
+        enemy_damage: Some(18000),
     }
 }
 
@@ -73,6 +80,13 @@ fn create_test_match_history(summoner_id: Uuid, game_id: i64) -> MatchHistory {
         role: Some("JUNGLE".to_string()),
         finished_at: Utc::now(),
         created_at: Utc::now(),
+        total_cs: 180,
+        total_gold: 13500,
+        total_damage: 20000,
+        enemy_champion_name: Some("Lee Sin".to_string()),
+        enemy_cs: Some(170),
+        enemy_gold: Some(12000),
+        enemy_damage: Some(18000),
     }
 }
 mod check_summoner_game_state {
