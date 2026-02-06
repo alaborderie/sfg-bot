@@ -75,10 +75,8 @@ pub trait Repository: Send + Sync {
         &self,
     ) -> Result<Vec<NotificationEvent>, RepositoryError>;
 
-    async fn mark_notifications_processed(
-        &self,
-        event_ids: &[Uuid],
-    ) -> Result<(), RepositoryError>;
+    async fn mark_notifications_processed(&self, event_ids: &[Uuid])
+    -> Result<(), RepositoryError>;
 }
 
 pub struct PgRepository {
