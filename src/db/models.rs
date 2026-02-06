@@ -49,6 +49,13 @@ pub struct MatchHistory {
     pub role: Option<String>,
     pub finished_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+    pub total_cs: i32,
+    pub total_gold: i32,
+    pub total_damage: i32,
+    pub enemy_champion_name: Option<String>,
+    pub enemy_cs: Option<i32>,
+    pub enemy_gold: Option<i32>,
+    pub enemy_damage: Option<i32>,
 }
 
 #[derive(Debug, Clone)]
@@ -65,6 +72,13 @@ pub struct NewMatchResult {
     pub game_mode: String,
     pub role: String,
     pub finished_at: DateTime<Utc>,
+    pub total_cs: i32,
+    pub total_gold: i32,
+    pub total_damage: i32,
+    pub enemy_champion_name: Option<String>,
+    pub enemy_cs: Option<i32>,
+    pub enemy_gold: Option<i32>,
+    pub enemy_damage: Option<i32>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -91,6 +105,13 @@ pub struct NotificationEvent {
     pub assists: Option<i32>,
     pub game_duration_secs: Option<i32>,
     pub game_mode: String,
+    pub total_cs: Option<i32>,
+    pub total_gold: Option<i32>,
+    pub total_damage: Option<i32>,
+    pub enemy_champion_name: Option<String>,
+    pub enemy_cs: Option<i32>,
+    pub enemy_gold: Option<i32>,
+    pub enemy_damage: Option<i32>,
     pub processed: bool,
     pub created_at: DateTime<Utc>,
     pub processed_at: Option<DateTime<Utc>>,
@@ -111,4 +132,11 @@ pub struct NewNotificationEvent {
     pub assists: Option<i32>,
     pub game_duration_secs: Option<i32>,
     pub game_mode: String,
+    pub total_cs: Option<i32>,
+    pub total_gold: Option<i32>,
+    pub total_damage: Option<i32>,
+    pub enemy_champion_name: Option<String>,
+    pub enemy_cs: Option<i32>,
+    pub enemy_gold: Option<i32>,
+    pub enemy_damage: Option<i32>,
 }

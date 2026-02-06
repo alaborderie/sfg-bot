@@ -30,6 +30,13 @@ pub struct MatchResult {
     pub game_duration_secs: i32,
     pub game_mode: String,
     pub role: String,
+    pub total_cs: i32,
+    pub total_gold: i32,
+    pub total_damage: i32,
+    pub enemy_champion_name: Option<String>,
+    pub enemy_cs: Option<i32>,
+    pub enemy_gold: Option<i32>,
+    pub enemy_damage: Option<i32>,
 }
 
 /// Represents a change in game state for a summoner
