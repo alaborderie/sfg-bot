@@ -77,41 +77,58 @@ async fn start_polling_task(
     riot_client: Arc<dyn RiotApiClient>,
     config: Config,
 ) {
-    let tracker = GameTracker::new(
-        riot_client,
-        repository.clone(),
-        config.default_region.clone(),
-    );
     let channel_id = ChannelId::new(config.discord_channel_id);
     let interval_secs = config.polling_interval_secs;
 
-    let mut first_run = true;
-
-    loop {
-        if !first_run {
-            tokio::time::sleep(Duration::from_secs(interval_secs)).await;
+    let summoners = match repository.get_all_summoners().await {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!("Failed to get summoners: {}", e);
+            return;
         }
-        first_run = false;
+    };
 
-        let summoners = match repository.get_all_summoners().await {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::error!("Failed to get summoners: {}", e);
-                continue;
+    tracing::info!("Starting {} independent polling tasks", summoners.len());
+
+    let mut handles = Vec::new();
+
+    for summoner in summoners {
+        let ctx = ctx.clone();
+        let riot_client = riot_client.clone();
+        let repository = repository.clone();
+        let region = config.default_region.clone();
+
+        let handle = tokio::spawn(async move {
+            let tracker = GameTracker::new(riot_client, repository, region);
+
+            tracing::info!(
+                "Polling task started for {}#{}",
+                summoner.game_name,
+                summoner.tag_line
+            );
+
+            loop {
+                if let Err(e) = check_and_notify(&ctx, &tracker, &summoner, channel_id).await {
+                    tracing::error!(
+                        "Error checking summoner {}#{}: {}",
+                        summoner.game_name,
+                        summoner.tag_line,
+                        e
+                    );
+                }
+
+                tokio::time::sleep(Duration::from_secs(interval_secs)).await;
             }
-        };
+        });
 
-        tracing::info!("Polling {} summoners", summoners.len());
+        handles.push(handle);
+    }
 
-        for summoner in summoners {
-            if let Err(e) = check_and_notify(&ctx, &tracker, &summoner, channel_id).await {
-                tracing::error!(
-                    "Error checking summoner {}#{}: {}",
-                    summoner.game_name,
-                    summoner.tag_line,
-                    e
-                );
-            }
+    // Wait for all tasks (they run indefinitely, so this blocks forever)
+    for handle in handles {
+        match handle.await {
+            Ok(never) => match never {},
+            Err(e) => tracing::error!("Polling task panicked: {}", e),
         }
     }
 }
