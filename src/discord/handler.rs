@@ -184,6 +184,13 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
                 assists: None,
                 game_duration_secs: None,
                 game_mode: game_info.game_mode,
+                total_cs: None,
+                total_gold: None,
+                total_damage: None,
+                enemy_champion_name: None,
+                enemy_cs: None,
+                enemy_gold: None,
+                enemy_damage: None,
             };
 
             tracker.repository.insert_notification_event(&event).await?;
@@ -222,6 +229,13 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
                         assists: Some(match_result.assists),
                         game_duration_secs: Some(match_result.game_duration_secs),
                         game_mode: match_result.game_mode,
+                        total_cs: Some(match_result.total_cs),
+                        total_gold: Some(match_result.total_gold),
+                        total_damage: Some(match_result.total_damage),
+                        enemy_champion_name: match_result.enemy_champion_name.clone(),
+                        enemy_cs: match_result.enemy_cs,
+                        enemy_gold: match_result.enemy_gold,
+                        enemy_damage: match_result.enemy_damage,
                     };
 
                     tracker.repository.insert_notification_event(&event).await?;

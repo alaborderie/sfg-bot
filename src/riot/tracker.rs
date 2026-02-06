@@ -126,6 +126,13 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
                 game_mode: match_result.game_mode.clone(),
                 role: match_result.role.clone(),
                 finished_at: chrono::Utc::now(),
+                total_cs: match_result.total_cs,
+                total_gold: match_result.total_gold,
+                total_damage: match_result.total_damage,
+                enemy_champion_name: match_result.enemy_champion_name.clone(),
+                enemy_cs: match_result.enemy_cs,
+                enemy_gold: match_result.enemy_gold,
+                enemy_damage: match_result.enemy_damage,
             };
 
             // Ignore errors on insert (might be duplicate)

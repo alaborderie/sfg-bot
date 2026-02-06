@@ -99,7 +99,27 @@ pub fn format_grouped_game_ended(
             // "💎 Champion · Role · W 10/2/5"
             let value_field = format!("💎 {} · {} · {} {}", champion_name, role, result_char, kda);
 
-            embed = embed.field(name_field, value_field, true);
+            // Stats field (CS/min, GPM, damage)
+            let stats_line = format_stats_line(
+                event.total_cs.unwrap_or(0),
+                event.total_gold.unwrap_or(0),
+                event.total_damage.unwrap_or(0),
+                event.game_duration_secs.unwrap_or(0),
+            );
+
+            // Enemy comparison field
+            let enemy_line = format_enemy_comparison(
+                event.enemy_champion_name.as_deref(),
+                event.enemy_cs,
+                event.enemy_gold,
+                event.enemy_damage,
+                event.game_duration_secs.unwrap_or(0),
+            );
+
+            embed = embed
+                .field(name_field, value_field, true)
+                .field("📊 Stats", stats_line, true)
+                .field("⚔️ vs", enemy_line, true);
         }
     }
 
@@ -116,5 +136,46 @@ fn format_list(items: &[String]) -> String {
             let rest = &items[..items.len() - 1];
             format!("{}, and {}", rest.join(", "), last)
         }
+    }
+}
+
+fn format_stats_line(cs: i32, gold: i32, damage: i32, game_duration_secs: i32) -> String {
+    let minutes = game_duration_secs as f64 / 60.0;
+    let cs_per_min = if minutes > 0.0 {
+        cs as f64 / minutes
+    } else {
+        0.0
+    };
+    let gold_per_min = if minutes > 0.0 {
+        gold as f64 / minutes
+    } else {
+        0.0
+    };
+
+    let dmg_str = if damage > 1000 {
+        format!("{:.1}k", damage as f64 / 1000.0)
+    } else {
+        format!("{}", damage)
+    };
+
+    format!(
+        "{:.1} CS/min · {:.0} GPM · {} dmg",
+        cs_per_min, gold_per_min, dmg_str
+    )
+}
+
+fn format_enemy_comparison(
+    enemy_champion: Option<&str>,
+    enemy_cs: Option<i32>,
+    enemy_gold: Option<i32>,
+    enemy_damage: Option<i32>,
+    game_duration_secs: i32,
+) -> String {
+    match (enemy_champion, enemy_cs, enemy_gold, enemy_damage) {
+        (Some(champ), Some(cs), Some(gold), Some(dmg)) => {
+            let stats = format_stats_line(cs, gold, dmg, game_duration_secs);
+            format!("⚔️ vs {} ({})", champ, stats)
+        }
+        _ => "⚔️ vs Unknown (no role data)".to_string(),
     }
 }
