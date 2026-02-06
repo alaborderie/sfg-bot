@@ -1,6 +1,6 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-CREATE TABLE summoners (
+CREATE TABLE IF NOT EXISTS summoners (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   riot_puuid VARCHAR(78) UNIQUE NOT NULL,
   game_name VARCHAR(24) NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE summoners (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE active_games (
+CREATE TABLE IF NOT EXISTS active_games (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   summoner_id UUID NOT NULL REFERENCES summoners(id) ON DELETE CASCADE,
   game_id BIGINT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE active_games (
   UNIQUE(summoner_id, game_id)
 );
 
-CREATE TABLE match_history (
+CREATE TABLE IF NOT EXISTS match_history (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   summoner_id UUID NOT NULL REFERENCES summoners(id) ON DELETE CASCADE,
   match_id VARCHAR(50) NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE match_history (
   UNIQUE(summoner_id, match_id)
 );
 
-CREATE INDEX idx_summoners_puuid ON summoners(riot_puuid);
-CREATE INDEX idx_active_games_summoner ON active_games(summoner_id);
-CREATE INDEX idx_match_history_summoner ON match_history(summoner_id);
-CREATE INDEX idx_match_history_finished ON match_history(finished_at);
+CREATE INDEX IF NOT EXISTS idx_summoners_puuid ON summoners(riot_puuid);
+CREATE INDEX IF NOT EXISTS idx_active_games_summoner ON active_games(summoner_id);
+CREATE INDEX IF NOT EXISTS idx_match_history_summoner ON match_history(summoner_id);
+CREATE INDEX IF NOT EXISTS idx_match_history_finished ON match_history(finished_at);
