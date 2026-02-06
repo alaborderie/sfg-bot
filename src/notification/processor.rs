@@ -1,6 +1,7 @@
 use crate::db::models::{NotificationEvent, Summoner};
 use crate::db::repository::Repository;
 use crate::notification::messages::{format_grouped_game_ended, format_grouped_game_started};
+use serenity::builder::CreateMessage;
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use std::collections::HashMap;
@@ -54,7 +55,7 @@ impl NotificationProcessor {
 
         for event in events {
             let event_age = now.signed_duration_since(event.created_at);
-            
+
             if event_age.to_std().unwrap_or(Duration::ZERO) < wait_threshold {
                 continue;
             }
@@ -79,19 +80,13 @@ impl NotificationProcessor {
         }
 
         for (game_id, group_events) in game_started_groups {
-            if let Err(e) = self
-                .send_grouped_game_started(game_id, group_events)
-                .await
-            {
+            if let Err(e) = self.send_grouped_game_started(game_id, group_events).await {
                 tracing::error!("Failed to send grouped game started notification: {}", e);
             }
         }
 
         for (match_id, group_events) in game_ended_groups {
-            if let Err(e) = self
-                .send_grouped_game_ended(&match_id, group_events)
-                .await
-            {
+            if let Err(e) = self.send_grouped_game_ended(&match_id, group_events).await {
                 tracing::error!("Failed to send grouped game ended notification: {}", e);
             }
         }
@@ -111,7 +106,7 @@ impl NotificationProcessor {
 
         let champions: Vec<_> = events
             .iter()
-            .map(|e| (e.summoner_id, e.champion_name.clone()))
+            .map(|e| (e.summoner_id, e.champion_name.clone(), String::new()))
             .collect();
 
         let game_mode = events
@@ -119,9 +114,12 @@ impl NotificationProcessor {
             .map(|e| e.game_mode.as_str())
             .unwrap_or("UNKNOWN");
 
-        let message = format_grouped_game_started(&summoners, &champions, game_mode);
+        let embed = format_grouped_game_started(&summoners, &champions, game_mode);
+        let builder = CreateMessage::new().embed(embed);
 
-        self.channel_id.say(&self.ctx.http, &message).await?;
+        self.channel_id
+            .send_message(&self.ctx.http, builder)
+            .await?;
 
         self.repository
             .mark_notifications_processed(&event_ids)
@@ -146,9 +144,12 @@ impl NotificationProcessor {
 
         let summoners = self.fetch_summoners(&summoner_ids).await?;
 
-        let message = format_grouped_game_ended(&summoners, &events);
+        let embed = format_grouped_game_ended(&summoners, &events);
+        let builder = CreateMessage::new().embed(embed);
 
-        self.channel_id.say(&self.ctx.http, &message).await?;
+        self.channel_id
+            .send_message(&self.ctx.http, builder)
+            .await?;
 
         self.repository
             .mark_notifications_processed(&event_ids)
