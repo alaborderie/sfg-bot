@@ -146,7 +146,7 @@ mod check_summoner_game_state {
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
         match result {
-            GameStateChange::GameEnded { game_id } => {
+            GameStateChange::GameEnded { game_id, is_featured_mode: _ } => {
                 assert_eq!(game_id, 12345);
             }
             _ => panic!("Expected GameEnded"),
@@ -177,7 +177,7 @@ mod check_summoner_game_state {
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
         match result {
-            GameStateChange::GameEnded { game_id } => {
+            GameStateChange::GameEnded { game_id, is_featured_mode: _ } => {
                 assert_eq!(game_id, 11111);
             }
             _ => panic!("Expected GameEnded for old game"),
@@ -370,7 +370,7 @@ mod handle_game_ended {
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
-        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
+        let result = tracker.handle_game_ended(&summoner, game_id, false).await.unwrap();
 
         assert!(result.is_some());
         let match_result = result.unwrap();
@@ -401,7 +401,7 @@ mod handle_game_ended {
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
-        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
+        let result = tracker.handle_game_ended(&summoner, game_id, false).await.unwrap();
 
         assert!(result.is_none());
     }
@@ -421,7 +421,7 @@ mod handle_game_ended {
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
-        let result = tracker.handle_game_ended(&summoner, game_id).await;
+        let result = tracker.handle_game_ended(&summoner, game_id, false).await;
 
         assert!(result.is_err());
     }
@@ -450,7 +450,7 @@ mod handle_game_ended {
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
-        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
+        let result = tracker.handle_game_ended(&summoner, game_id, false).await.unwrap();
 
         assert!(result.is_some());
     }
