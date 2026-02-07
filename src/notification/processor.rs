@@ -114,7 +114,9 @@ impl NotificationProcessor {
             .map(|e| e.game_mode.as_str())
             .unwrap_or("UNKNOWN");
 
-        let embed = format_grouped_game_started(&summoners, &champions, game_mode);
+        let queue_id = events.first().and_then(|e| e.queue_id);
+
+        let embed = format_grouped_game_started(&summoners, &champions, game_mode, queue_id);
         let builder = CreateMessage::new().embed(embed);
 
         self.channel_id

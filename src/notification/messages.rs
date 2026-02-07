@@ -4,17 +4,35 @@ use serenity::model::{Colour, Timestamp};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+/// Convert a Riot API queue_id to a friendly name
+fn get_queue_type_name(queue_id: Option<i32>) -> String {
+    match queue_id {
+        Some(420) => "Ranked Solo/Duo".to_string(),
+        Some(440) => "Ranked Flex".to_string(),
+        Some(400) => "Draft Pick".to_string(),
+        Some(430) => "Blind Pick".to_string(),
+        Some(450) => "ARAM".to_string(),
+        Some(490) => "Quickplay".to_string(),
+        Some(1700) => "Arena".to_string(),
+        Some(id) => format!("Queue {}", id),
+        None => "Unknown".to_string(),
+    }
+}
+
 pub fn format_grouped_game_started(
     summoners: &[Summoner],
     champions: &[(Uuid, String, String)],
     game_mode: &str,
+    queue_id: Option<i32>,
 ) -> CreateEmbed {
     let summoner_names: Vec<String> = summoners.iter().map(|s| s.game_name.clone()).collect();
 
+    let queue_type = get_queue_type_name(queue_id);
     let description = format!(
-        "{} started a {} game",
+        "{} started a {} game ({})",
         format_list(&summoner_names),
-        game_mode
+        game_mode,
+        queue_type
     );
 
     let champion_map: HashMap<Uuid, String> = champions
@@ -22,14 +40,13 @@ pub fn format_grouped_game_started(
         .map(|(id, name, _)| (*id, name.clone()))
         .collect();
 
+    let footer_text = format!("League of Legends · {} · {}", game_mode, queue_type);
+
     let mut embed = CreateEmbed::new()
         .title("🎮 Game Started!")
         .description(description)
         .colour(Colour::from_rgb(52, 152, 219))
-        .footer(CreateEmbedFooter::new(format!(
-            "League of Legends · {}",
-            game_mode
-        )))
+        .footer(CreateEmbedFooter::new(footer_text))
         .timestamp(Timestamp::now());
 
     for summoner in summoners {
@@ -65,17 +82,22 @@ pub fn format_grouped_game_ended(
     }
 
     let color = if losses == 0 {
-        Colour::from_rgb(46, 204, 113) // Green
+        Colour::from_rgb(46, 204, 113)
     } else if wins == 0 {
-        Colour::from_rgb(231, 76, 60) // Red
+        Colour::from_rgb(231, 76, 60)
     } else {
-        Colour::from_rgb(241, 196, 15) // Gold/Orange
+        Colour::from_rgb(241, 196, 15)
     };
 
     let is_featured_mode = events
         .first()
         .map(|event| event.is_featured_mode)
         .unwrap_or(false);
+
+    let queue_type = events
+        .first()
+        .and_then(|event| event.queue_id)
+        .map(|qid| get_queue_type_name(Some(qid)));
 
     let description = if is_featured_mode {
         format!(
@@ -86,7 +108,13 @@ pub fn format_grouped_game_ended(
         format!("{} game ended! Check your stats.", game_mode)
     };
 
-    let footer_text = if is_featured_mode {
+    let footer_text = if let Some(queue) = queue_type {
+        if is_featured_mode {
+            format!("League of Legends · {} · {} (Featured)", game_mode, queue)
+        } else {
+            format!("League of Legends · {} · {}", game_mode, queue)
+        }
+    } else if is_featured_mode {
         format!("League of Legends · {} (Featured)", game_mode)
     } else {
         format!("League of Legends · {}", game_mode)
@@ -121,10 +149,8 @@ pub fn format_grouped_game_ended(
             let role = event.role.as_deref().unwrap_or("Unknown");
             let champion_name = &event.champion_name;
 
-            // "💎 Champion · Role · W 10/2/5"
             let value_field = format!("💎 {} · {} · {} {}", champion_name, role, result_char, kda);
 
-            // Stats field (CS/min, GPM, damage)
             let stats_line = format_stats_line(
                 event.total_cs.unwrap_or(0),
                 event.total_gold.unwrap_or(0),
@@ -132,7 +158,6 @@ pub fn format_grouped_game_ended(
                 event.game_duration_secs.unwrap_or(0),
             );
 
-            // Enemy comparison field
             let enemy_line = format_enemy_comparison(
                 event.enemy_champion_name.as_deref(),
                 event.enemy_cs,

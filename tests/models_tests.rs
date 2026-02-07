@@ -54,6 +54,7 @@ mod active_game_info {
             champion_id: 157,
             game_mode: "CLASSIC".to_string(),
             game_start_time: now,
+            queue_id: None,
         };
         assert_eq!(info.game_id, 12345);
         assert_eq!(info.champion_id, 157);
@@ -67,6 +68,7 @@ mod active_game_info {
             champion_id: 157,
             game_mode: "CLASSIC".to_string(),
             game_start_time: Utc::now(),
+            queue_id: None,
         };
         let cloned = info.clone();
         assert_eq!(info.game_id, cloned.game_id);
@@ -81,6 +83,7 @@ mod active_game_info {
                 champion_id: 1,
                 game_mode: mode.to_string(),
                 game_start_time: Utc::now(),
+                queue_id: None,
             };
             assert_eq!(info.game_mode, mode);
         }
@@ -110,6 +113,7 @@ mod match_result {
             enemy_cs: Some(180),
             enemy_gold: Some(14000),
             enemy_damage: Some(22000),
+            queue_id: None,
         };
         assert_eq!(result.match_id, "EUW1_12345");
         assert!(result.win);
@@ -136,6 +140,7 @@ mod match_result {
             enemy_cs: Some(180),
             enemy_gold: Some(13000),
             enemy_damage: Some(24000),
+            queue_id: None,
         };
         assert!(!result.win);
     }
@@ -160,6 +165,7 @@ mod match_result {
             enemy_cs: None,
             enemy_gold: None,
             enemy_damage: None,
+            queue_id: None,
         };
         let cloned = result.clone();
         assert_eq!(result.match_id, cloned.match_id);
@@ -186,6 +192,7 @@ mod match_result {
             enemy_cs: None,
             enemy_gold: None,
             enemy_damage: None,
+            queue_id: None,
         };
         assert_eq!(result.kills, 0);
         assert_eq!(result.deaths, 0);
@@ -203,6 +210,7 @@ mod game_state_change {
             champion_id: 157,
             game_mode: "CLASSIC".to_string(),
             game_start_time: Utc::now(),
+            queue_id: None,
         };
         let change = GameStateChange::GameStarted(game_info);
         assert!(matches!(change, GameStateChange::GameStarted(_)));
@@ -244,6 +252,7 @@ mod game_state_change {
             champion_id: 1,
             game_mode: "ARAM".to_string(),
             game_start_time: Utc::now(),
+            queue_id: None,
         };
         let change = GameStateChange::GameStarted(info);
         if let GameStateChange::GameStarted(game_info) = change {
@@ -266,6 +275,7 @@ mod new_active_game {
             champion_id: 157,
             game_mode: "CLASSIC".to_string(),
             game_start_time: Utc::now(),
+            queue_id: None,
         };
         assert_eq!(game.game_id, 12345);
         assert_eq!(game.champion_id, 157);
@@ -279,6 +289,7 @@ mod new_active_game {
             champion_id: 157,
             game_mode: "CLASSIC".to_string(),
             game_start_time: Utc::now(),
+            queue_id: None,
         };
         let cloned = game.clone();
         assert_eq!(game.game_id, cloned.game_id);
@@ -310,6 +321,7 @@ mod new_match_result {
             enemy_cs: Some(180),
             enemy_gold: Some(14000),
             enemy_damage: Some(22000),
+            queue_id: None,
         };
         assert!(result.win);
         assert_eq!(result.kills, 10);
@@ -337,6 +349,7 @@ mod new_match_result {
             enemy_cs: None,
             enemy_gold: None,
             enemy_damage: None,
+            queue_id: None,
         };
         let cloned = result.clone();
         assert_eq!(result.match_id, cloned.match_id);

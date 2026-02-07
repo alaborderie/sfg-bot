@@ -31,6 +31,7 @@ fn create_dummy_event(win: bool) -> NotificationEvent {
         assists: Some(5),
         game_duration_secs: Some(1800),
         game_mode: "CLASSIC".to_string(),
+        queue_id: Some(420),
         is_featured_mode: false,
         total_cs: Some(200),
         total_gold: Some(12000),

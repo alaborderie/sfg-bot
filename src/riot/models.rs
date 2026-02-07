@@ -15,6 +15,7 @@ pub struct ActiveGameInfo {
     pub champion_id: i32,
     pub game_mode: String,
     pub game_start_time: DateTime<Utc>,
+    pub queue_id: Option<i32>,
 }
 
 /// Result of a completed match from Match API
@@ -37,6 +38,7 @@ pub struct MatchResult {
     pub enemy_cs: Option<i32>,
     pub enemy_gold: Option<i32>,
     pub enemy_damage: Option<i32>,
+    pub queue_id: Option<i32>,
 }
 
 /// Represents a change in game state for a summoner

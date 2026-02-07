@@ -147,11 +147,14 @@ impl RiotApiClient for RiotClient {
                 .single()
                 .unwrap_or_else(Utc::now);
 
+            let queue_id = g.game_queue_config_id.map(|q| q.0 as i32);
+
             ActiveGameInfo {
                 game_id: g.game_id,
                 champion_id,
                 game_mode: g.game_mode.to_string(),
                 game_start_time: game_start,
+                queue_id,
             }
         }))
     }
@@ -195,6 +198,8 @@ impl RiotApiClient for RiotClient {
                 None => (None, None, None, None),
             };
 
+            let queue_id = Some(m.info.queue_id.0 as i32);
+
             Some(MatchResult {
                 match_id: m.metadata.match_id,
                 game_id: m.info.game_id,
@@ -213,6 +218,7 @@ impl RiotApiClient for RiotClient {
                 enemy_cs,
                 enemy_gold,
                 enemy_damage,
+                queue_id,
             })
         }))
     }

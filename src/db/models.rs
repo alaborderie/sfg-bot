@@ -21,6 +21,7 @@ pub struct ActiveGame {
     pub champion_id: i32,
     pub game_mode: String,
     pub game_start_time: DateTime<Utc>,
+    pub queue_id: Option<i32>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -31,6 +32,7 @@ pub struct NewActiveGame {
     pub champion_id: i32,
     pub game_mode: String,
     pub game_start_time: DateTime<Utc>,
+    pub queue_id: Option<i32>,
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -47,6 +49,7 @@ pub struct MatchHistory {
     pub game_duration_secs: i32,
     pub game_mode: String,
     pub role: Option<String>,
+    pub queue_id: Option<i32>,
     pub finished_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub total_cs: i32,
@@ -71,6 +74,7 @@ pub struct NewMatchResult {
     pub game_duration_secs: i32,
     pub game_mode: String,
     pub role: String,
+    pub queue_id: Option<i32>,
     pub finished_at: DateTime<Utc>,
     pub total_cs: i32,
     pub total_gold: i32,
@@ -105,6 +109,7 @@ pub struct NotificationEvent {
     pub assists: Option<i32>,
     pub game_duration_secs: Option<i32>,
     pub game_mode: String,
+    pub queue_id: Option<i32>,
     pub is_featured_mode: bool,
     pub total_cs: Option<i32>,
     pub total_gold: Option<i32>,
@@ -133,6 +138,7 @@ pub struct NewNotificationEvent {
     pub assists: Option<i32>,
     pub game_duration_secs: Option<i32>,
     pub game_mode: String,
+    pub queue_id: Option<i32>,
     pub is_featured_mode: bool,
     pub total_cs: Option<i32>,
     pub total_gold: Option<i32>,

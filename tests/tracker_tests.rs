@@ -29,6 +29,7 @@ fn create_test_active_game_info(game_id: i64) -> ActiveGameInfo {
         champion_id: 1,
         game_mode: "CLASSIC".to_string(),
         game_start_time: Utc::now(),
+        queue_id: None,
     }
 }
 
@@ -41,6 +42,7 @@ fn create_test_active_game(summoner_id: Uuid, game_id: i64) -> ActiveGame {
         game_mode: "CLASSIC".to_string(),
         game_start_time: Utc::now(),
         created_at: Utc::now(),
+        queue_id: None,
     }
 }
 
@@ -63,6 +65,7 @@ fn create_test_match_result(game_id: i64) -> MatchResult {
         enemy_cs: Some(170),
         enemy_gold: Some(12000),
         enemy_damage: Some(18000),
+        queue_id: None,
     }
 }
 
@@ -89,6 +92,7 @@ fn create_test_match_history(summoner_id: Uuid, game_id: i64) -> MatchHistory {
         enemy_cs: Some(170),
         enemy_gold: Some(12000),
         enemy_damage: Some(18000),
+        queue_id: None,
     }
 }
 mod check_summoner_game_state {
@@ -371,6 +375,7 @@ mod handle_game_started {
                     game_mode: new_game.game_mode.clone(),
                     game_start_time: new_game.game_start_time,
                     created_at: Utc::now(),
+                    queue_id: new_game.queue_id,
                 })
             });
 

@@ -149,9 +149,9 @@ impl Repository for PgRepository {
     ) -> Result<ActiveGame, RepositoryError> {
         let active_game = sqlx::query_as::<_, ActiveGame>(
             r#"
-            INSERT INTO active_games (summoner_id, game_id, champion_id, game_mode, game_start_time)
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, summoner_id, game_id, champion_id, game_mode, game_start_time, created_at
+            INSERT INTO active_games (summoner_id, game_id, champion_id, game_mode, game_start_time, queue_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, summoner_id, game_id, champion_id, game_mode, game_start_time, queue_id, created_at
             "#,
         )
         .bind(game.summoner_id)
@@ -159,6 +159,7 @@ impl Repository for PgRepository {
         .bind(game.champion_id)
         .bind(&game.game_mode)
         .bind(game.game_start_time)
+        .bind(game.queue_id)
         .fetch_one(&self.pool)
         .await?;
         Ok(active_game)
@@ -218,10 +219,10 @@ impl Repository for PgRepository {
     ) -> Result<MatchHistory, RepositoryError> {
         let match_history = sqlx::query_as::<_, MatchHistory>(
              r#"
-             INSERT INTO match_history (summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, finished_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+             INSERT INTO match_history (summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, queue_id, finished_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
              ON CONFLICT (summoner_id, match_id) DO NOTHING
-             RETURNING id, summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, finished_at, created_at
+             RETURNING id, summoner_id, match_id, game_id, win, kills, deaths, assists, champion_id, game_duration_secs, game_mode, role, queue_id, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, finished_at, created_at
              "#,
          )
          .bind(result.summoner_id)
@@ -242,6 +243,7 @@ impl Repository for PgRepository {
          .bind(result.enemy_cs)
          .bind(result.enemy_gold)
          .bind(result.enemy_damage)
+         .bind(result.queue_id)
          .bind(result.finished_at)
          .fetch_one(&self.pool)
          .await?;
@@ -302,9 +304,9 @@ impl Repository for PgRepository {
     ) -> Result<NotificationEvent, RepositoryError> {
         let notification = sqlx::query_as::<_, NotificationEvent>(
               r#"
-              INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, is_featured_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
-              RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, is_featured_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, processed, created_at, processed_at
+              INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, queue_id, is_featured_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+              RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, queue_id, is_featured_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, processed, created_at, processed_at
               "#,
           )
           .bind(event.summoner_id)
@@ -320,6 +322,7 @@ impl Repository for PgRepository {
           .bind(event.assists)
           .bind(event.game_duration_secs)
           .bind(&event.game_mode)
+          .bind(event.queue_id)
           .bind(event.is_featured_mode)
           .bind(event.total_cs)
           .bind(event.total_gold)

@@ -94,6 +94,7 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
             champion_id: game_info.champion_id,
             game_mode: game_info.game_mode.clone(),
             game_start_time: game_info.game_start_time,
+            queue_id: game_info.queue_id,
         };
 
         self.repository.insert_active_game(&new_game).await?;
@@ -128,6 +129,7 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
                 game_duration_secs: match_result.game_duration_secs,
                 game_mode: match_result.game_mode.clone(),
                 role: match_result.role.clone(),
+                queue_id: match_result.queue_id,
                 finished_at: chrono::Utc::now(),
                 total_cs: match_result.total_cs,
                 total_gold: match_result.total_gold,
