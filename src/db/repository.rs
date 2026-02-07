@@ -55,6 +55,12 @@ pub trait Repository: Send + Sync {
         result: &NewMatchResult,
     ) -> Result<MatchHistory, RepositoryError>;
 
+    async fn get_match_history_by_match_id(
+        &self,
+        summoner_id: Uuid,
+        match_id: &str,
+    ) -> Result<Option<MatchHistory>, RepositoryError>;
+
     async fn upsert_champion(
         &self,
         champion_id: i32,
@@ -239,6 +245,21 @@ impl Repository for PgRepository {
          .bind(result.finished_at)
          .fetch_one(&self.pool)
          .await?;
+        Ok(match_history)
+    }
+
+    async fn get_match_history_by_match_id(
+        &self,
+        summoner_id: Uuid,
+        match_id: &str,
+    ) -> Result<Option<MatchHistory>, RepositoryError> {
+        let match_history = sqlx::query_as::<_, MatchHistory>(
+            "SELECT * FROM match_history WHERE summoner_id = $1 AND match_id = $2",
+        )
+        .bind(summoner_id)
+        .bind(match_id)
+        .fetch_optional(&self.pool)
+        .await?;
         Ok(match_history)
     }
 

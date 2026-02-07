@@ -196,22 +196,16 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
 
             tracker.repository.insert_notification_event(&event).await?;
         }
-        GameStateChange::GameEnded {
-            game_id,
-            is_featured_mode,
-        } => {
+        GameStateChange::GameEnded { game_id } => {
             tracing::info!(
-                "Game ended for {}#{}: game_id={}, featured_mode={}",
+                "Game ended for {}#{}: game_id={}",
                 summoner.game_name,
                 summoner.tag_line,
-                game_id,
-                is_featured_mode
+                game_id
             );
 
             let summoner_clone = summoner.clone();
-            let tracker_result = tracker
-                .handle_game_ended(summoner, game_id, is_featured_mode)
-                .await;
+            let tracker_result = tracker.handle_game_ended(summoner, game_id).await;
 
             match tracker_result {
                 Ok(Some(match_result)) => {
@@ -259,6 +253,70 @@ async fn check_and_notify<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
                 Err(e) => {
                     tracing::error!(
                         "Error handling game end for {}#{}: {}",
+                        summoner_clone.game_name,
+                        summoner_clone.tag_line,
+                        e
+                    );
+                }
+            }
+        }
+        GameStateChange::FeaturedModeGameEnded { game_id } => {
+            tracing::info!(
+                "Featured mode game ended for {}#{}: game_id={}",
+                summoner.game_name,
+                summoner.tag_line,
+                game_id
+            );
+
+            let summoner_clone = summoner.clone();
+            let tracker_result = tracker.handle_game_ended(summoner, game_id).await;
+
+            match tracker_result {
+                Ok(Some(match_result)) => {
+                    let champion_name = tracker
+                        .repository
+                        .get_champion_by_id(match_result.champion_id)
+                        .await?
+                        .map(|c| c.champion_name)
+                        .unwrap_or_else(|| format!("Champion #{}", match_result.champion_id));
+
+                    let event = NewNotificationEvent {
+                        summoner_id: summoner_clone.id,
+                        event_type: "GAME_ENDED".to_string(),
+                        game_id: match_result.game_id,
+                        match_id: Some(match_result.match_id),
+                        champion_id: match_result.champion_id,
+                        champion_name,
+                        role: Some(match_result.role),
+                        win: Some(match_result.win),
+                        kills: Some(match_result.kills),
+                        deaths: Some(match_result.deaths),
+                        assists: Some(match_result.assists),
+                        game_duration_secs: Some(match_result.game_duration_secs),
+                        game_mode: match_result.game_mode,
+                        is_featured_mode: true,
+                        total_cs: Some(match_result.total_cs),
+                        total_gold: Some(match_result.total_gold),
+                        total_damage: Some(match_result.total_damage),
+                        enemy_champion_name: match_result.enemy_champion_name.clone(),
+                        enemy_cs: match_result.enemy_cs,
+                        enemy_gold: match_result.enemy_gold,
+                        enemy_damage: match_result.enemy_damage,
+                    };
+
+                    tracker.repository.insert_notification_event(&event).await?;
+                }
+                Ok(None) => {
+                    tracing::warn!(
+                        "Could not get match result for {}#{} game {}",
+                        summoner_clone.game_name,
+                        summoner_clone.tag_line,
+                        game_id
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Error handling featured mode game end for {}#{}: {}",
                         summoner_clone.game_name,
                         summoner_clone.tag_line,
                         e

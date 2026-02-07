@@ -43,6 +43,13 @@ pub trait RiotApiClient: Send + Sync {
         region: RegionalRoute,
     ) -> Result<Option<MatchResult>, RiotClientError>;
 
+    /// Get the most recent match ID for a summoner
+    async fn get_recent_match_id(
+        &self,
+        puuid: &str,
+        region: RegionalRoute,
+    ) -> Result<Option<String>, RiotClientError>;
+
     async fn get_all_champions(
         &self,
     ) -> Result<std::collections::HashMap<i32, String>, RiotClientError>;
@@ -208,6 +215,20 @@ impl RiotApiClient for RiotClient {
                 enemy_damage,
             })
         }))
+    }
+
+    async fn get_recent_match_id(
+        &self,
+        puuid: &str,
+        region: RegionalRoute,
+    ) -> Result<Option<String>, RiotClientError> {
+        let matches = self
+            .api
+            .match_v5()
+            .get_match_ids_by_puuid(region, puuid, Some(1), None, None, None, None, None)
+            .await?;
+
+        Ok(matches.first().cloned())
     }
 
     async fn get_all_champions(

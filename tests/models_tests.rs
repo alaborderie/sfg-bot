@@ -210,10 +210,7 @@ mod game_state_change {
 
     #[test]
     fn can_create_game_ended() {
-        let change = GameStateChange::GameEnded {
-            game_id: 12345,
-            is_featured_mode: false,
-        };
+        let change = GameStateChange::GameEnded { game_id: 12345 };
         assert!(matches!(change, GameStateChange::GameEnded { .. }));
     }
 
@@ -232,15 +229,8 @@ mod game_state_change {
 
     #[test]
     fn game_ended_contains_game_id() {
-        let change = GameStateChange::GameEnded {
-            game_id: 99999,
-            is_featured_mode: false,
-        };
-        if let GameStateChange::GameEnded {
-            game_id,
-            is_featured_mode: _,
-        } = change
-        {
+        let change = GameStateChange::GameEnded { game_id: 99999 };
+        if let GameStateChange::GameEnded { game_id } = change {
             assert_eq!(game_id, 99999);
         } else {
             panic!("Expected GameEnded");

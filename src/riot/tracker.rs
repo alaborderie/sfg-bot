@@ -35,6 +35,7 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
         summoner: &Summoner,
     ) -> Result<GameStateChange, TrackerError> {
         let platform = RiotClient::platform_for_region(&self.default_region);
+        let region = RiotClient::regional_for_region(&self.default_region);
 
         // Get current game from Spectator API
         let current_game = self
@@ -68,17 +69,14 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
                 // Return GameEnded first, next poll will catch the new game
                 Ok(GameStateChange::GameEnded {
                     game_id: db_game.game_id,
-                    is_featured_mode: false,
                 })
             }
             // Game ended (was in DB, no longer in Spectator)
-            (None, Some(db_game)) => {
-                let is_featured = self.is_game_featured_mode(db_game);
-                Ok(GameStateChange::GameEnded {
-                    game_id: db_game.game_id,
-                    is_featured_mode: is_featured,
-                })
-            }
+            (None, Some(db_game)) => Ok(GameStateChange::GameEnded {
+                game_id: db_game.game_id,
+            }),
+            // No active game in Spectator or DB, check match history fallback
+            (None, None) => self.check_featured_mode_game_end(summoner, region).await,
             // Still in same game or still not in game
             _ => Ok(GameStateChange::NoChange),
         }
@@ -107,7 +105,6 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
         &self,
         summoner: &Summoner,
         game_id: i64,
-        _is_featured_mode: bool,
     ) -> Result<Option<MatchResult>, TrackerError> {
         // Delete from active games
         self.repository
@@ -197,18 +194,42 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
         Ok(None)
     }
 
-    /// Check if a game is likely a featured mode (ARAM Mayhem, Arena)
-    /// Featured modes don't return from Spectator API, so detection is heuristic
-    /// If ARAM game and >5 min elapsed since start, likely featured mode
-    fn is_game_featured_mode(&self, db_game: &crate::db::models::ActiveGame) -> bool {
-        if db_game.game_mode.to_uppercase() != "ARAM" {
-            return false;
+    async fn check_featured_mode_game_end(
+        &self,
+        summoner: &Summoner,
+        region: riven::consts::RegionalRoute,
+    ) -> Result<GameStateChange, TrackerError> {
+        let recent_match_id = self
+            .riot_client
+            .get_recent_match_id(&summoner.riot_puuid, region)
+            .await?;
+
+        let Some(match_id) = recent_match_id else {
+            return Ok(GameStateChange::NoChange);
+        };
+
+        if self
+            .repository
+            .get_match_history_by_match_id(summoner.id, &match_id)
+            .await?
+            .is_some()
+        {
+            return Ok(GameStateChange::NoChange);
         }
 
-        let elapsed = chrono::Utc::now()
-            .signed_duration_since(db_game.game_start_time)
-            .num_seconds();
+        let Some(game_id) = match_id
+            .split_once('_')
+            .and_then(|(_, game_id)| game_id.parse::<i64>().ok())
+        else {
+            tracing::warn!(
+                "Could not parse game ID from match ID {} for {}#{}",
+                match_id,
+                summoner.game_name,
+                summoner.tag_line
+            );
+            return Ok(GameStateChange::NoChange);
+        };
 
-        elapsed > 300
+        Ok(GameStateChange::FeaturedModeGameEnded { game_id })
     }
 }

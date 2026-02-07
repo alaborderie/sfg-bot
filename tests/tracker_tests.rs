@@ -1,6 +1,8 @@
+#![cfg(feature = "test-mocks")]
+
 use chrono::Utc;
 use mockall::predicate::*;
-use riven::consts::PlatformRoute;
+use riven::consts::{PlatformRoute, RegionalRoute};
 use sfg_bot::db::models::{ActiveGame, MatchHistory, NewActiveGame, Summoner};
 use sfg_bot::riot::client::RiotClientError;
 use sfg_bot::riot::models::{ActiveGameInfo, GameStateChange, MatchResult};
@@ -102,6 +104,7 @@ mod check_summoner_game_state {
             .with(eq(summoner.riot_puuid.clone()), eq(PlatformRoute::NA1))
             .times(1)
             .returning(move |_, _| Ok(Some(create_test_active_game_info(12345))));
+        mock_riot.expect_get_recent_match_id().never();
 
         let mut mock_repo = MockRepository::new();
         mock_repo
@@ -109,6 +112,8 @@ mod check_summoner_game_state {
             .with(eq(summoner.id))
             .times(1)
             .returning(|_| Ok(vec![]));
+
+        mock_repo.expect_get_match_history_by_match_id().never();
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
@@ -132,6 +137,7 @@ mod check_summoner_game_state {
             .with(eq(summoner.riot_puuid.clone()), eq(PlatformRoute::NA1))
             .times(1)
             .returning(|_, _| Ok(None));
+        mock_riot.expect_get_recent_match_id().never();
 
         let summoner_id = summoner.id;
         let mut mock_repo = MockRepository::new();
@@ -141,12 +147,14 @@ mod check_summoner_game_state {
             .times(1)
             .returning(move |_| Ok(vec![create_test_active_game(summoner_id, 12345)]));
 
+        mock_repo.expect_get_match_history_by_match_id().never();
+
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
         match result {
-            GameStateChange::GameEnded { game_id, is_featured_mode: _ } => {
+            GameStateChange::GameEnded { game_id } => {
                 assert_eq!(game_id, 12345);
             }
             _ => panic!("Expected GameEnded"),
@@ -163,6 +171,7 @@ mod check_summoner_game_state {
             .with(eq(summoner.riot_puuid.clone()), eq(PlatformRoute::NA1))
             .times(1)
             .returning(|_, _| Ok(Some(create_test_active_game_info(22222))));
+        mock_riot.expect_get_recent_match_id().never();
 
         let summoner_id = summoner.id;
         let mut mock_repo = MockRepository::new();
@@ -172,12 +181,14 @@ mod check_summoner_game_state {
             .times(1)
             .returning(move |_| Ok(vec![create_test_active_game(summoner_id, 11111)]));
 
+        mock_repo.expect_get_match_history_by_match_id().never();
+
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
         match result {
-            GameStateChange::GameEnded { game_id, is_featured_mode: _ } => {
+            GameStateChange::GameEnded { game_id } => {
                 assert_eq!(game_id, 11111);
             }
             _ => panic!("Expected GameEnded for old game"),
@@ -194,6 +205,11 @@ mod check_summoner_game_state {
             .with(eq(summoner.riot_puuid.clone()), eq(PlatformRoute::NA1))
             .times(1)
             .returning(|_, _| Ok(None));
+        mock_riot
+            .expect_get_recent_match_id()
+            .with(eq(summoner.riot_puuid.clone()), eq(RegionalRoute::AMERICAS))
+            .times(1)
+            .returning(|_, _| Ok(None));
 
         let mut mock_repo = MockRepository::new();
         mock_repo
@@ -201,12 +217,53 @@ mod check_summoner_game_state {
             .with(eq(summoner.id))
             .times(1)
             .returning(|_| Ok(vec![]));
+        mock_repo.expect_get_match_history_by_match_id().never();
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
         let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
 
         assert!(matches!(result, GameStateChange::NoChange));
+    }
+
+    #[tokio::test]
+    async fn returns_featured_mode_game_ended_when_recent_match_not_seen() {
+        let summoner = create_test_summoner();
+
+        let mut mock_riot = MockRiotApiClient::new();
+        mock_riot
+            .expect_get_active_game()
+            .with(eq(summoner.riot_puuid.clone()), eq(PlatformRoute::NA1))
+            .times(1)
+            .returning(|_, _| Ok(None));
+        mock_riot
+            .expect_get_recent_match_id()
+            .with(eq(summoner.riot_puuid.clone()), eq(RegionalRoute::AMERICAS))
+            .times(1)
+            .returning(|_, _| Ok(Some("NA1_777777".to_string())));
+
+        let mut mock_repo = MockRepository::new();
+        mock_repo
+            .expect_get_active_games_for_summoner()
+            .with(eq(summoner.id))
+            .times(1)
+            .returning(|_| Ok(vec![]));
+        mock_repo
+            .expect_get_match_history_by_match_id()
+            .with(eq(summoner.id), eq("NA1_777777"))
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
+
+        let result = tracker.check_summoner_game_state(&summoner).await.unwrap();
+
+        match result {
+            GameStateChange::FeaturedModeGameEnded { game_id } => {
+                assert_eq!(game_id, 777777);
+            }
+            _ => panic!("Expected FeaturedModeGameEnded"),
+        }
     }
 
     #[tokio::test]
@@ -220,6 +277,7 @@ mod check_summoner_game_state {
             .with(eq(summoner.riot_puuid.clone()), eq(PlatformRoute::NA1))
             .times(1)
             .returning(|_, _| Ok(Some(create_test_active_game_info(12345))));
+        mock_riot.expect_get_recent_match_id().never();
 
         let mut mock_repo = MockRepository::new();
         mock_repo
@@ -227,6 +285,8 @@ mod check_summoner_game_state {
             .with(eq(summoner.id))
             .times(1)
             .returning(move |_| Ok(vec![create_test_active_game(summoner_id, 12345)]));
+
+        mock_repo.expect_get_match_history_by_match_id().never();
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
@@ -244,6 +304,8 @@ mod check_summoner_game_state {
             .expect_get_active_game()
             .times(1)
             .returning(|_, _| Err(RiotClientError::UnknownRegion("test".to_string())));
+
+        mock_riot.expect_get_recent_match_id().never();
 
         let mock_repo = MockRepository::new();
 
@@ -269,6 +331,7 @@ mod check_summoner_game_state {
             .expect_get_active_games_for_summoner()
             .times(1)
             .returning(|_| Err(RepositoryError::Database(sqlx::Error::RowNotFound)));
+        mock_repo.expect_get_match_history_by_match_id().never();
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
@@ -370,7 +433,7 @@ mod handle_game_ended {
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
-        let result = tracker.handle_game_ended(&summoner, game_id, false).await.unwrap();
+        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 
         assert!(result.is_some());
         let match_result = result.unwrap();
@@ -401,7 +464,7 @@ mod handle_game_ended {
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
-        let result = tracker.handle_game_ended(&summoner, game_id, false).await.unwrap();
+        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 
         assert!(result.is_none());
     }
@@ -421,7 +484,7 @@ mod handle_game_ended {
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
-        let result = tracker.handle_game_ended(&summoner, game_id, false).await;
+        let result = tracker.handle_game_ended(&summoner, game_id).await;
 
         assert!(result.is_err());
     }
@@ -450,7 +513,7 @@ mod handle_game_ended {
 
         let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
 
-        let result = tracker.handle_game_ended(&summoner, game_id, false).await.unwrap();
+        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 
         assert!(result.is_some());
     }

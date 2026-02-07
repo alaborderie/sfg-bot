@@ -45,11 +45,9 @@ pub enum GameStateChange {
     /// Summoner started a new game
     GameStarted(ActiveGameInfo),
     /// Summoner's game ended (need to fetch match result)
-    /// is_featured_mode: true if game is likely ARAM Mayhem/Arena (featured mode)
-    GameEnded {
-        game_id: i64,
-        is_featured_mode: bool,
-    },
+    GameEnded { game_id: i64 },
+    /// Summoner's featured mode game ended (detected via match history)
+    FeaturedModeGameEnded { game_id: i64 },
     /// No change in game state
     NoChange,
 }

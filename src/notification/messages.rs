@@ -72,10 +72,16 @@ pub fn format_grouped_game_ended(
         Colour::from_rgb(241, 196, 15) // Gold/Orange
     };
 
-    let is_featured_mode = game_mode.to_uppercase() == "ARAM";
+    let is_featured_mode = events
+        .first()
+        .map(|event| event.is_featured_mode)
+        .unwrap_or(false);
+
     let description = if is_featured_mode {
-        "ARAM Mayhem ended! (Featured game - may take longer to process) Check your stats."
-            .to_string()
+        format!(
+            "{} featured mode ended! Match history may take a bit to update.",
+            game_mode
+        )
     } else {
         format!("{} game ended! Check your stats.", game_mode)
     };
@@ -87,7 +93,11 @@ pub fn format_grouped_game_ended(
     };
 
     let mut embed = CreateEmbed::new()
-        .title(format!("{} Wins, {} Losses", wins, losses))
+        .title(if wins > losses {
+            "Game Won!"
+        } else {
+            "Game Lost!"
+        })
         .description(description)
         .colour(color)
         .footer(CreateEmbedFooter::new(footer_text))
