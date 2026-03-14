@@ -100,11 +100,13 @@ mod tests {
             value.get("color"),
             Some(&serde_json::json!(Colour::from_rgb(149, 165, 166).0))
         );
-        assert!(value
-            .get("description")
-            .and_then(|desc| desc.as_str())
-            .unwrap_or_default()
-            .contains("Analyse indisponible"));
+        assert!(
+            value
+                .get("description")
+                .and_then(|desc| desc.as_str())
+                .unwrap_or_default()
+                .contains("Analyse indisponible")
+        );
     }
 
     #[test]
