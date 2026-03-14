@@ -299,9 +299,7 @@ impl RiotApiClient for RiotClient {
             .unwrap_or((None, None, None, None));
 
         let (gold_diff_at_10, gold_diff_at_15, gold_diff_at_20) =
-            extract_timeline_diff(timeline.as_ref(), participant, enemy_data, |f| {
-                f.total_gold
-            });
+            extract_timeline_diff(timeline.as_ref(), participant, enemy_data, |f| f.total_gold);
 
         let (cs_diff_at_10, cs_diff_at_15, cs_diff_at_20) =
             extract_timeline_diff(timeline.as_ref(), participant, enemy_data, |f| {
