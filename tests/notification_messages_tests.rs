@@ -56,7 +56,7 @@ fn test_game_won_title() {
 
     // Debug print the embed to inspect the title, as fields might be private
     let debug_str = format!("{:?}", embed);
-    assert!(debug_str.contains("Game Won!"));
+    assert!(debug_str.contains("Partie gagnée !"));
 }
 
 #[test]
@@ -68,5 +68,5 @@ fn test_game_lost_title() {
     let embed = format_grouped_game_ended(&[summoner], &[event], "Ranked Solo/Duo");
 
     let debug_str = format!("{:?}", embed);
-    assert!(debug_str.contains("Game Lost!"));
+    assert!(debug_str.contains("Partie perdue !"));
 }

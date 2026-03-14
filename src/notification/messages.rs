@@ -8,15 +8,15 @@ use uuid::Uuid;
 /// Convert a Riot API queue_id to a friendly name
 fn get_queue_type_name(queue_id: Option<i32>) -> String {
     match queue_id {
-        Some(420) => "Ranked Solo/Duo".to_string(),
-        Some(440) => "Ranked Flex".to_string(),
+        Some(420) => "Classée Solo/Duo".to_string(),
+        Some(440) => "Classée Flex".to_string(),
         Some(400) => "Draft Pick".to_string(),
         Some(430) => "Blind Pick".to_string(),
         Some(450) => "ARAM".to_string(),
         Some(490) => "Quickplay".to_string(),
-        Some(1700) => "Arena".to_string(),
-        Some(id) => format!("Queue {}", id),
-        None => "Unknown".to_string(),
+        Some(1700) => "Arène".to_string(),
+        Some(id) => format!("File {}", id),
+        None => "Inconnu".to_string(),
     }
 }
 
@@ -30,7 +30,7 @@ pub fn format_grouped_game_started(
 
     let queue_type = get_queue_type_name(queue_id);
     let description = format!(
-        "{} started a {} game ({})",
+        "{} a lancé une partie {} ({})",
         format_list(&summoner_names),
         game_mode,
         queue_type
@@ -44,7 +44,7 @@ pub fn format_grouped_game_started(
     let footer_text = format!("League of Legends · {} · {}", game_mode, queue_type);
 
     let mut embed = CreateEmbed::new()
-        .title("🎮 Game Started!")
+        .title("🎮 Partie lancée !")
         .description(description)
         .colour(Colour::from_rgb(52, 152, 219))
         .footer(CreateEmbedFooter::new(footer_text))
@@ -55,7 +55,7 @@ pub fn format_grouped_game_started(
         let champion = champion_map
             .get(&summoner.id)
             .cloned()
-            .unwrap_or_else(|| "Unknown".to_string());
+            .unwrap_or_else(|| "Inconnu".to_string());
 
         embed = embed.field(name, champion, true);
     }
@@ -102,11 +102,11 @@ pub fn format_grouped_game_ended(
 
     let description = if is_featured_mode {
         format!(
-            "{} featured mode ended! Match history may take a bit to update.",
+            "Le mode featured {} est terminé ! L'historique des matchs peut prendre un moment à se mettre à jour.",
             game_mode
         )
     } else {
-        format!("{} game ended! Check your stats.", game_mode)
+        format!("La partie {} est terminée ! Vérifie tes stats.", game_mode)
     };
 
     let footer_text = if let Some(queue) = queue_type {
@@ -123,9 +123,9 @@ pub fn format_grouped_game_ended(
 
     let mut embed = CreateEmbed::new()
         .title(if wins > losses {
-            "Game Won!"
+            "Partie gagnée !"
         } else {
-            "Game Lost!"
+            "Partie perdue !"
         })
         .description(description)
         .colour(color)
@@ -147,7 +147,7 @@ pub fn format_grouped_game_ended(
             );
 
             let result_char = if is_win { "W" } else { "L" };
-            let role = event.role.as_deref().unwrap_or("Unknown");
+            let role = event.role.as_deref().unwrap_or("Inconnu");
             let champion_name = &event.champion_name;
 
             let value_field = format!("💎 {} · {} · {} {}", champion_name, role, result_char, kda);
@@ -214,9 +214,9 @@ pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult)
     );
 
     let title = if match_result.win {
-        "Game Won!"
+        "Partie gagnée !"
     } else {
-        "Game Lost!"
+        "Partie perdue !"
     };
 
     let footer_text = format!(
@@ -226,7 +226,10 @@ pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult)
 
     CreateEmbed::new()
         .title(title)
-        .description(format!("{} game ended for {}.", queue_type, summoner_name))
+        .description(format!(
+            "Partie {} terminée pour {}.",
+            queue_type, summoner_name
+        ))
         .colour(color)
         .field(
             format!("{} {}", name_prefix, summoner_name),
@@ -243,11 +246,11 @@ fn format_list(items: &[String]) -> String {
     match items.len() {
         0 => String::new(),
         1 => items[0].clone(),
-        2 => format!("{} and {}", items[0], items[1]),
+        2 => format!("{} et {}", items[0], items[1]),
         _ => {
             let last = items.last().unwrap();
             let rest = &items[..items.len() - 1];
-            format!("{}, and {}", rest.join(", "), last)
+            format!("{} et {}", rest.join(", "), last)
         }
     }
 }
@@ -289,6 +292,6 @@ fn format_enemy_comparison(
             let stats = format_stats_line(cs, gold, dmg, game_duration_secs);
             format!("{} ({})", champ, stats)
         }
-        _ => "⚔️ vs Unknown (no role data)".to_string(),
+        _ => "⚔️ vs Inconnu (pas de données de rôle)".to_string(),
     }
 }
