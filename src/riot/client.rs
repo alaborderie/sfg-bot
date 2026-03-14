@@ -300,12 +300,12 @@ impl RiotApiClient for RiotClient {
 
         let (gold_diff_at_10, gold_diff_at_15, gold_diff_at_20) =
             extract_timeline_diff(timeline.as_ref(), participant, enemy_data, |f| {
-                f.total_gold as i32
+                f.total_gold
             });
 
         let (cs_diff_at_10, cs_diff_at_15, cs_diff_at_20) =
             extract_timeline_diff(timeline.as_ref(), participant, enemy_data, |f| {
-                (f.minions_killed + f.jungle_minions_killed) as i32
+                f.minions_killed + f.jungle_minions_killed
             });
 
         let challenges = participant.challenges.as_ref();
@@ -317,8 +317,8 @@ impl RiotApiClient for RiotClient {
             kills: participant.kills,
             deaths: participant.deaths,
             assists: participant.assists,
-            kda: challenges.and_then(|c| c.kda.map(|v| v as f32)),
-            kill_participation: challenges.and_then(|c| c.kill_participation.map(|v| v as f32)),
+            kda: challenges.and_then(|c| c.kda),
+            kill_participation: challenges.and_then(|c| c.kill_participation),
             gold_per_minute: challenges.and_then(|c| c.gold_per_minute),
             damage_per_minute: challenges.and_then(|c| c.damage_per_minute),
             vision_score_per_minute: challenges.and_then(|c| c.vision_score_per_minute),
@@ -413,8 +413,8 @@ fn extract_timeline_diff(
         return (None, None, None);
     };
 
-    let participant_id = participant.participant_id as i32;
-    let enemy_id = enemy.participant_id as i32;
+    let participant_id = participant.participant_id;
+    let enemy_id = enemy.participant_id;
 
     let frames = &timeline.info.frames;
 

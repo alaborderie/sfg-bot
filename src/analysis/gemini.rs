@@ -199,8 +199,8 @@ fn build_prompt_text(prompt: &str, data_json: &str) -> String {
 fn extract_response_text(parsed: GeminiResponse) -> Result<String, GeminiError> {
     parsed
         .candidates
-        .get(0)
-        .and_then(|candidate| candidate.content.parts.get(0))
+        .first()
+        .and_then(|candidate| candidate.content.parts.first())
         .and_then(|part| part.text.clone())
         .ok_or_else(|| {
             GeminiError::ParseError("Missing candidates content in Gemini response".to_string())
