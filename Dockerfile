@@ -29,5 +29,6 @@ RUN apk --no-cache add ca-certificates
 WORKDIR /app
 
 COPY --from=builder /app/target/release/sfg-bot .
+COPY ANALYSIS_PROMPT.md .
 
 CMD ["./sfg-bot"]
