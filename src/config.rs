@@ -12,6 +12,8 @@ pub struct Config {
     pub database_url: String,
     pub default_region: String,
     pub polling_interval_secs: u64,
+    pub gemini_api_key: Option<String>,
+    pub analysis_prompt_path: String,
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +66,15 @@ impl Config {
             .parse()
             .unwrap_or(180);
 
+        let gemini_api_key = env::var("GEMINI_API_KEY").ok();
+        let analysis_prompt_path =
+            env::var("ANALYSIS_PROMPT_PATH").unwrap_or_else(|_| "ANALYSIS_PROMPT.md".to_string());
+
+        tracing::info!(
+            has_gemini_api_key = gemini_api_key.is_some(),
+            analysis_prompt_path = analysis_prompt_path.as_str()
+        );
+
         Self {
             riot_api_key,
             discord_bot_token,
@@ -74,6 +85,8 @@ impl Config {
             database_url,
             default_region,
             polling_interval_secs,
+            gemini_api_key,
+            analysis_prompt_path,
         }
     }
 }
