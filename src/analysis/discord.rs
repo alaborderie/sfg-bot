@@ -2,6 +2,8 @@ use crate::analysis::models::AnalysisResult;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 use serenity::model::Colour;
 
+const MAX_DESCRIPTION_LEN: usize = 4096;
+
 pub fn format_analysis_embed(result: &AnalysisResult) -> CreateEmbed {
     let (title, description, colour) = if let Some(error) = &result.error {
         (
@@ -19,7 +21,7 @@ pub fn format_analysis_embed(result: &AnalysisResult) -> CreateEmbed {
 
     CreateEmbed::new()
         .title(title)
-        .description(description)
+        .description(truncate_description(&description))
         .colour(colour)
         .footer(CreateEmbedFooter::new("Powered by Gemini Flash Lite"))
 }
@@ -27,7 +29,9 @@ pub fn format_analysis_embed(result: &AnalysisResult) -> CreateEmbed {
 pub fn format_analysis_error_embed(summoner_name: &str, error_msg: &str) -> CreateEmbed {
     CreateEmbed::new()
         .title(format!("📊 Game Analysis — {summoner_name}"))
-        .description(format!("⚠️ Analysis unavailable: {error_msg}"))
+        .description(truncate_description(&format!(
+            "⚠️ Analysis unavailable: {error_msg}"
+        )))
         .colour(Colour::from_rgb(149, 165, 166))
         .footer(CreateEmbedFooter::new("Powered by Gemini Flash Lite"))
 }
@@ -39,6 +43,19 @@ fn rating_colour(rating: Option<&str>) -> Colour {
         Some(rating) if rating.eq_ignore_ascii_case("poor") => Colour::from_rgb(231, 76, 60),
         _ => Colour::from_rgb(149, 165, 166),
     }
+}
+
+fn truncate_description(description: &str) -> String {
+    if description.len() <= MAX_DESCRIPTION_LEN {
+        return description.to_string();
+    }
+
+    let mut truncated = description
+        .chars()
+        .take(MAX_DESCRIPTION_LEN - 3)
+        .collect::<String>();
+    truncated.push_str("...");
+    truncated
 }
 
 #[cfg(test)]
@@ -102,5 +119,26 @@ mod tests {
             value.get("color"),
             Some(&serde_json::json!(Colour::from_rgb(149, 165, 166).0))
         );
+    }
+
+    #[test]
+    fn format_analysis_embed_truncates_long_description() {
+        let long_summary = "a".repeat(5000);
+        let result = AnalysisResult {
+            summoner_name: "Test".to_string(),
+            champion_name: "Ahri".to_string(),
+            overall_rating: Some("Good".to_string()),
+            summary: long_summary,
+            error: None,
+        };
+
+        let embed = format_analysis_embed(&result);
+        let value = serde_json::to_value(embed).expect("serialize embed");
+        let description = value
+            .get("description")
+            .and_then(|desc| desc.as_str())
+            .unwrap_or_default();
+        assert_eq!(description.len(), MAX_DESCRIPTION_LEN);
+        assert!(description.ends_with("..."));
     }
 }
