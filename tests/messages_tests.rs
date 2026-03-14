@@ -70,7 +70,7 @@ mod format_game_ended_tests {
     #[test]
     fn win_contains_won_text() {
         let msg = format_game_ended("Catory", true, 10, 5, 15, 1800, None);
-        assert!(msg.contains("won"));
+        assert!(msg.contains("a gagné"));
     }
 
     #[test]
@@ -82,7 +82,7 @@ mod format_game_ended_tests {
     #[test]
     fn loss_contains_lost_text() {
         let msg = format_game_ended("Catory", false, 3, 8, 5, 1500, None);
-        assert!(msg.contains("lost"));
+        assert!(msg.contains("a perdu"));
     }
 
     #[test]
@@ -161,49 +161,49 @@ mod format_game_ended_tests {
     #[test]
     fn role_jungle() {
         let msg = format_game_ended("Catory", true, 10, 5, 15, 1800, Some("JUNGLE"));
-        assert!(msg.contains("on role Jungle"));
+        assert!(msg.contains("en rôle Jungle"));
     }
 
     #[test]
     fn role_top() {
         let msg = format_game_ended("Player", true, 10, 5, 15, 1800, Some("TOP"));
-        assert!(msg.contains("on role Top"));
+        assert!(msg.contains("en rôle Top"));
     }
 
     #[test]
     fn role_middle() {
         let msg = format_game_ended("Player", true, 10, 5, 15, 1800, Some("MIDDLE"));
-        assert!(msg.contains("on role Mid"));
+        assert!(msg.contains("en rôle Mid"));
     }
 
     #[test]
     fn role_bottom() {
         let msg = format_game_ended("Player", true, 10, 5, 15, 1800, Some("BOTTOM"));
-        assert!(msg.contains("on role Bot"));
+        assert!(msg.contains("en rôle Bot"));
     }
 
     #[test]
     fn role_utility() {
         let msg = format_game_ended("Player", true, 10, 5, 15, 1800, Some("UTILITY"));
-        assert!(msg.contains("on role Support"));
+        assert!(msg.contains("en rôle Support"));
     }
 
     #[test]
     fn role_empty_string() {
         let msg = format_game_ended("Player", true, 10, 5, 15, 1800, Some(""));
-        assert!(!msg.contains("on role"));
+        assert!(!msg.contains("en rôle"));
     }
 
     #[test]
     fn role_invalid() {
         let msg = format_game_ended("Player", true, 10, 5, 15, 1800, Some("Invalid"));
-        assert!(!msg.contains("on role"));
+        assert!(!msg.contains("en rôle"));
     }
 
     #[test]
     fn role_none() {
         let msg = format_game_ended("Player", true, 10, 5, 15, 1800, None);
-        assert!(!msg.contains("on role"));
+        assert!(!msg.contains("en rôle"));
     }
 }
 
@@ -213,7 +213,7 @@ mod format_mention_response_tests {
     #[test]
     fn returns_not_implemented_message() {
         let msg = format_mention_response();
-        assert_eq!(msg, "This feature is not implemented yet!");
+        assert_eq!(msg, "Cette fonctionnalité n'est pas encore implémentée !");
     }
 
     #[test]

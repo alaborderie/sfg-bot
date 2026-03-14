@@ -12,12 +12,12 @@ use std::sync::Arc;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("analyze-last-game")
-        .description("Analyze the last game of any summoner")
+        .description("Analyse la dernière partie d'un invocateur")
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::String,
                 "summoner_name",
-                "Summoner name in format: Name#Tag",
+                "Nom d'invocateur au format : Nom#Tag",
             )
             .required(true),
         )
@@ -56,7 +56,7 @@ pub async fn run(
         send_error_followup(
             ctx,
             command,
-            "Please provide a summoner name in format: `Name#Tag`",
+            "Merci de fournir un nom d'invocateur au format : `Nom#Tag`",
         )
         .await;
         return;
@@ -66,7 +66,7 @@ pub async fn run(
         send_error_followup(
             ctx,
             command,
-            "Invalid format. Use `Name#Tag` (e.g. `Doublelift#NA1`)",
+            "Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)",
         )
         .await;
         return;
@@ -79,7 +79,7 @@ pub async fn run(
         send_error_followup(
             ctx,
             command,
-            "Invalid format. Use `Name#Tag` (e.g. `Doublelift#NA1`)",
+            "Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)",
         )
         .await;
         return;
@@ -101,7 +101,7 @@ pub async fn run(
             send_error_followup(
                 ctx,
                 command,
-                &format!("Could not find account `{summoner_input}`. Check the name and tag."),
+                &format!("Compte `{summoner_input}` introuvable. Vérifie le nom et le tag."),
             )
             .await;
             return;
@@ -117,7 +117,7 @@ pub async fn run(
             send_error_followup(
                 ctx,
                 command,
-                &format!("No recent matches found for `{summoner_input}`."),
+                &format!("Aucune partie récente trouvée pour `{summoner_input}`."),
             )
             .await;
             return;
@@ -131,7 +131,7 @@ pub async fn run(
             send_error_followup(
                 ctx,
                 command,
-                "Failed to fetch recent match data from Riot API.",
+                "Impossible de récupérer les données de la dernière partie depuis l'API Riot.",
             )
             .await;
             return;
@@ -144,7 +144,12 @@ pub async fn run(
     {
         Ok(Some(result)) => result,
         Ok(None) => {
-            send_error_followup(ctx, command, "Could not retrieve match details.").await;
+            send_error_followup(
+                ctx,
+                command,
+                "Impossible de récupérer les détails de la partie.",
+            )
+            .await;
             return;
         }
         Err(e) => {
@@ -154,7 +159,12 @@ pub async fn run(
                 error = %e,
                 "Failed to fetch match result"
             );
-            send_error_followup(ctx, command, "Failed to fetch match details from Riot API.").await;
+            send_error_followup(
+                ctx,
+                command,
+                "Impossible de récupérer les détails de la partie depuis l'API Riot.",
+            )
+            .await;
             return;
         }
     };
