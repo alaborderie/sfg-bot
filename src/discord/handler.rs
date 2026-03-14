@@ -5,6 +5,7 @@ use crate::analysis::pipeline::AnalysisPipeline;
 use crate::config::Config;
 use crate::db::models::{NewNotificationEvent, Summoner};
 use crate::db::repository::Repository;
+use crate::discord::commands;
 use crate::discord::messages::format_mention_response;
 use crate::notification::NotificationProcessor;
 use crate::riot::client::RiotApiClient;
@@ -13,6 +14,7 @@ use crate::riot::models::GameStateChange;
 use crate::riot::tracker::GameTracker;
 use serenity::async_trait;
 use serenity::builder::CreateMessage;
+use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, GuildId};
@@ -73,8 +75,21 @@ impl Bot {
 
 #[async_trait]
 impl EventHandler for Bot {
-    async fn ready(&self, _ctx: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         tracing::info!("Bot ready as {}", ready.user.name);
+
+        let guild_id = GuildId::new(self.config.discord_server_id);
+        match guild_id
+            .set_commands(&ctx.http, vec![commands::register()])
+            .await
+        {
+            Ok(cmds) => {
+                tracing::info!("Registered {} slash command(s)", cmds.len());
+            }
+            Err(e) => {
+                tracing::error!("Failed to register slash commands: {}", e);
+            }
+        }
     }
 
     async fn cache_ready(&self, ctx: Context, _guilds: Vec<GuildId>) {
@@ -106,6 +121,26 @@ impl EventHandler for Bot {
             let processor = NotificationProcessor::new(repository, ctx_clone, channel_id, 5);
             processor.start().await;
         });
+    }
+
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Command(command) = interaction {
+            match command.data.name.as_str() {
+                "analyze-last-game" => {
+                    commands::run(
+                        &ctx,
+                        &command,
+                        &self.riot_client,
+                        &self.analysis_pipeline,
+                        &self.config.default_region,
+                    )
+                    .await;
+                }
+                _ => {
+                    tracing::warn!("Unknown slash command: {}", command.data.name);
+                }
+            }
+        }
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
