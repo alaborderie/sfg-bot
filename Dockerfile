@@ -1,28 +1,24 @@
-FROM rust:1.93-alpine AS builder
+# syntax=docker/dockerfile:1
+FROM lukemathwalker/cargo-chef:latest-rust-1.93-alpine AS chef
 
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 
 WORKDIR /app
 
-# Copy manifests
-COPY Cargo.toml Cargo.lock ./
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-# Create dummy src for dependency caching
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+ENV SQLX_OFFLINE=true
+RUN cargo chef cook --release --recipe-path recipe.json
 
-# Build dependencies only
-RUN cargo build --release && rm -rf src
-
-# Copy actual source code
 COPY src ./src
 COPY migrations ./migrations
+RUN cargo build --release --locked
 
-# Build the application with SQLX_OFFLINE
-ENV SQLX_OFFLINE=true
-RUN touch src/main.rs && cargo build --release
-
-# Runtime stage
-FROM alpine:3.23
+FROM alpine:3.23 AS runtime
 
 RUN apk --no-cache add ca-certificates
 
