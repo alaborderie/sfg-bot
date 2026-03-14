@@ -432,11 +432,33 @@ fn diff_at_frame(
     enemy_id: i32,
     metric: &impl Fn(&riven::models::match_v5::ParticipantFrame) -> i32,
 ) -> Option<i32> {
-    let frame = frames.get(minute)?;
-    let participant_frames = frame.participant_frames.as_ref()?;
-    let participant_frame = participant_frames.get(&participant_id)?;
-    let enemy_frame = participant_frames.get(&enemy_id)?;
-    Some(metric(participant_frame) - metric(enemy_frame))
+    if frames.is_empty() {
+        return None;
+    }
+
+    let start = minute.min(frames.len().saturating_sub(1));
+
+    for idx in (0..=start).rev() {
+        let frame = frames.get(idx)?;
+        let participant_frames = match frame.participant_frames.as_ref() {
+            Some(frames) => frames,
+            None => continue,
+        };
+
+        let participant_frame = match participant_frames.get(&participant_id) {
+            Some(frame) => frame,
+            None => continue,
+        };
+
+        let enemy_frame = match participant_frames.get(&enemy_id) {
+            Some(frame) => frame,
+            None => continue,
+        };
+
+        return Some(metric(participant_frame) - metric(enemy_frame));
+    }
+
+    None
 }
 
 #[cfg(test)]
@@ -526,6 +548,14 @@ mod tests {
         }
     }
 
+    fn build_empty_frame() -> FramesTimeLine {
+        FramesTimeLine {
+            events: Vec::new(),
+            participant_frames: None,
+            timestamp: 600000,
+        }
+    }
+
     #[test]
     fn diff_at_frame_returns_gold_difference() {
         let frames = vec![build_frame(1, 2)];
@@ -545,5 +575,12 @@ mod tests {
         let frames = vec![build_frame(1, 2)];
         let diff = diff_at_frame(&frames, 0, 1, 999, &|frame| frame.total_gold);
         assert!(diff.is_none());
+    }
+
+    #[test]
+    fn diff_at_frame_falls_back_to_previous_frame() {
+        let frames = vec![build_frame(1, 2), build_empty_frame()];
+        let diff = diff_at_frame(&frames, 1, 1, 2, &|frame| frame.total_gold);
+        assert_eq!(diff, Some(200));
     }
 }
