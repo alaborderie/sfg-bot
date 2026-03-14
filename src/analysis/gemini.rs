@@ -146,6 +146,14 @@ impl GeminiClient {
                         return Err(GeminiError::RateLimited);
                     }
 
+                    if status.is_client_error() {
+                        let body_text = resp
+                            .text()
+                            .await
+                            .unwrap_or_else(|_| "<response body unavailable>".to_string());
+                        return Err(GeminiError::ApiError(body_text));
+                    }
+
                     let body_text = resp
                         .text()
                         .await
