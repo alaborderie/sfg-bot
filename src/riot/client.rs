@@ -254,12 +254,14 @@ impl RiotApiClient for RiotClient {
         summoner_name: &str,
         region: RegionalRoute,
     ) -> Result<Option<AnalysisData>, RiotClientError> {
-        let match_data = self.api.match_v5().get_match(region, match_id).await?;
+        let (match_data, timeline) = tokio::try_join!(
+            self.api.match_v5().get_match(region, match_id),
+            self.api.match_v5().get_timeline(region, match_id)
+        )?;
+
         let Some(match_data) = match_data else {
             return Ok(None);
         };
-
-        let timeline = self.get_match_timeline(match_id, region).await?;
 
         let Some(participant) = match_data
             .info
@@ -301,12 +303,10 @@ impl RiotApiClient for RiotClient {
                 f.total_gold as i32
             });
 
-        let (cs_diff_at_10, cs_diff_at_15, cs_diff_at_20) = extract_timeline_diff(
-            timeline.as_ref(),
-            participant,
-            enemy_data,
-            |f| (f.minions_killed + f.jungle_minions_killed) as i32,
-        );
+        let (cs_diff_at_10, cs_diff_at_15, cs_diff_at_20) =
+            extract_timeline_diff(timeline.as_ref(), participant, enemy_data, |f| {
+                (f.minions_killed + f.jungle_minions_killed) as i32
+            });
 
         let challenges = participant.challenges.as_ref();
 
@@ -436,9 +436,13 @@ fn diff_at_frame(
         return None;
     }
 
-    let start = minute.min(frames.len().saturating_sub(1));
+    // Return None if the match ended before the requested minute.
+    // Clamping to the last frame would produce misleading diff values.
+    if frames.len() <= minute {
+        return None;
+    }
 
-    for idx in (0..=start).rev() {
+    for idx in (0..=minute).rev() {
         let frame = frames.get(idx)?;
         let participant_frames = match frame.participant_frames.as_ref() {
             Some(frames) => frames,

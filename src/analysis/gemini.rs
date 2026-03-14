@@ -183,9 +183,8 @@ impl GeminiClient {
             }
         }
 
-        Err(last_error.unwrap_or_else(|| {
-            GeminiError::ApiError("Unknown Gemini API error".to_string())
-        }))
+        Err(last_error
+            .unwrap_or_else(|| GeminiError::ApiError("Unknown Gemini API error".to_string())))
     }
 }
 
@@ -274,12 +273,17 @@ mod tests {
 
         let value = serde_json::to_value(&request).expect("serialize request");
         assert!(value.get("contents").is_some());
-        let config = value.get("generationConfig").expect("generationConfig missing");
+        let config = value
+            .get("generationConfig")
+            .expect("generationConfig missing");
         let temperature = config
             .get("temperature")
             .and_then(serde_json::Value::as_f64)
             .expect("temperature missing or not a number");
         assert!((temperature - 0.7).abs() < 1e-6);
-        assert_eq!(config.get("maxOutputTokens"), Some(&serde_json::json!(1024)));
+        assert_eq!(
+            config.get("maxOutputTokens"),
+            Some(&serde_json::json!(1024))
+        );
     }
 }

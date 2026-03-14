@@ -1,12 +1,12 @@
+use crate::analysis::discord::{format_analysis_embed, format_analysis_error_embed};
+use crate::analysis::gemini::GeminiClient;
+use crate::analysis::models::AnalysisResult;
+use crate::analysis::pipeline::AnalysisPipeline;
 use crate::config::Config;
 use crate::db::models::{NewNotificationEvent, Summoner};
 use crate::db::repository::Repository;
 use crate::discord::messages::format_mention_response;
 use crate::notification::NotificationProcessor;
-use crate::analysis::discord::{format_analysis_embed, format_analysis_error_embed};
-use crate::analysis::gemini::GeminiClient;
-use crate::analysis::models::AnalysisResult;
-use crate::analysis::pipeline::AnalysisPipeline;
 use crate::riot::client::RiotApiClient;
 use crate::riot::client::RiotClient;
 use crate::riot::models::GameStateChange;
@@ -166,9 +166,14 @@ async fn start_polling_task(
             );
 
             loop {
-                if let Err(e) =
-                    check_and_notify(&ctx, &tracker, &summoner, channel_id, analysis_pipeline.clone())
-                        .await
+                if let Err(e) = check_and_notify(
+                    &ctx,
+                    &tracker,
+                    &summoner,
+                    channel_id,
+                    analysis_pipeline.clone(),
+                )
+                .await
                 {
                     tracing::error!(
                         "Error checking summoner {}#{}: {}",
@@ -444,13 +449,20 @@ fn spawn_analysis_task<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Siz
                 summary: "Analysis unavailable: match data not found".to_string(),
                 error: Some("match data not found".to_string()),
             },
-            Err(error) => AnalysisResult {
-                summoner_name: summoner_name.clone(),
-                champion_name: "Unknown".to_string(),
-                overall_rating: None,
-                summary: format!("Analysis unavailable: {error}"),
-                error: Some(error.to_string()),
-            },
+            Err(error) => {
+                tracing::warn!(
+                    summoner = summoner_name.as_str(),
+                    error = %error,
+                    "Failed to fetch match analysis data"
+                );
+                AnalysisResult {
+                    summoner_name: summoner_name.clone(),
+                    champion_name: "Unknown".to_string(),
+                    overall_rating: None,
+                    summary: "Analysis unavailable: could not retrieve match data".to_string(),
+                    error: Some("could not retrieve match data".to_string()),
+                }
+            }
         };
 
         let embed = if result.error.is_some() {

@@ -32,7 +32,8 @@ pub struct AnalysisPipeline {
 
 impl AnalysisPipeline {
     pub fn new(gemini_client: GeminiClient, prompt_path: &str) -> Result<Self, AnalysisError> {
-        let prompt_template = fs::read_to_string(prompt_path).map_err(AnalysisError::PromptFileError)?;
+        let prompt_template =
+            fs::read_to_string(prompt_path).map_err(AnalysisError::PromptFileError)?;
         Ok(Self {
             gemini_client,
             prompt_template,
