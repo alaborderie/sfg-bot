@@ -1,4 +1,5 @@
 use crate::db::models::{NotificationEvent, Summoner};
+use crate::riot::models::MatchResult;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 use serenity::model::{Colour, Timestamp};
 use std::collections::HashMap;
@@ -174,6 +175,68 @@ pub fn format_grouped_game_ended(
     }
 
     embed
+}
+
+pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult) -> CreateEmbed {
+    let color = if match_result.win {
+        Colour::from_rgb(46, 204, 113)
+    } else {
+        Colour::from_rgb(231, 76, 60)
+    };
+
+    let queue_type = get_queue_type_name(match_result.queue_id);
+    let result_char = if match_result.win { "W" } else { "L" };
+    let name_prefix = if match_result.win { "🏆" } else { "💔" };
+
+    let kda = format!(
+        "{}/{}/{}",
+        match_result.kills, match_result.deaths, match_result.assists
+    );
+
+    let value_field = format!(
+        "💎 {} · {} · {} {}",
+        match_result.champion_name, &match_result.role, result_char, kda
+    );
+
+    let stats_line = format_stats_line(
+        match_result.total_cs,
+        match_result.total_gold,
+        match_result.total_damage,
+        match_result.game_duration_secs,
+    );
+
+    let enemy_line = format_enemy_comparison(
+        match_result.enemy_champion_name.as_deref(),
+        match_result.enemy_cs,
+        match_result.enemy_gold,
+        match_result.enemy_damage,
+        match_result.game_duration_secs,
+    );
+
+    let title = if match_result.win {
+        "Game Won!"
+    } else {
+        "Game Lost!"
+    };
+
+    let footer_text = format!(
+        "League of Legends · {} · {}",
+        match_result.game_mode, queue_type
+    );
+
+    CreateEmbed::new()
+        .title(title)
+        .description(format!("{} game ended for {}.", queue_type, summoner_name))
+        .colour(color)
+        .field(
+            format!("{} {}", name_prefix, summoner_name),
+            value_field,
+            true,
+        )
+        .field("📊 Stats", stats_line, true)
+        .field("⚔️ vs", enemy_line, true)
+        .footer(CreateEmbedFooter::new(footer_text))
+        .timestamp(Timestamp::now())
 }
 
 fn format_list(items: &[String]) -> String {
