@@ -29,6 +29,14 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
         }
     }
 
+    pub fn riot_client(&self) -> Arc<R> {
+        self.riot_client.clone()
+    }
+
+    pub fn default_region(&self) -> &str {
+        &self.default_region
+    }
+
     /// Check if summoner's game state has changed
     pub async fn check_summoner_game_state(
         &self,
