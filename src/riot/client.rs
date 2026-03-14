@@ -223,6 +223,7 @@ impl RiotApiClient for RiotClient {
                 deaths: participant.deaths,
                 assists: participant.assists,
                 champion_id: participant.champion().map(|c| c.0 as i32).unwrap_or(0),
+                champion_name: participant.champion_name.clone(),
                 game_duration_secs: m.info.game_duration as i32,
                 game_mode: m.info.game_mode.to_string(),
                 role: participant.team_position.clone(),

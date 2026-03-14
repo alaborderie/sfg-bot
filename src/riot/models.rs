@@ -28,6 +28,7 @@ pub struct MatchResult {
     pub deaths: i32,
     pub assists: i32,
     pub champion_id: i32,
+    pub champion_name: String,
     pub game_duration_secs: i32,
     pub game_mode: String,
     pub role: String,

@@ -55,6 +55,7 @@ fn create_test_match_result(game_id: i64) -> MatchResult {
         deaths: 2,
         assists: 5,
         champion_id: 1,
+        champion_name: "Annie".to_string(),
         game_duration_secs: 1800,
         game_mode: "CLASSIC".to_string(),
         role: "JUNGLE".to_string(),
