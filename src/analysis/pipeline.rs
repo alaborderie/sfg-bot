@@ -83,7 +83,7 @@ impl AnalysisPipeline {
             summoner_name: data.summoner_name.clone(),
             champion_name: data.champion_name.clone(),
             overall_rating: None,
-            summary: format!("Analysis unavailable: {error_message}"),
+            summary: format!("Analyse indisponible : {error_message}"),
             error: Some(error_message),
         }
     }

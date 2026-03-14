@@ -10,6 +10,7 @@ Focus areas:
 7) Gold Efficiency: gold per minute and comparison with lane opponent.
 
 Output rules:
+- Respond entirely in French.
 - Respond in 3–5 sentences.
 - Start with the overall rating.
 - Be specific about numbers where relevant.

@@ -7,13 +7,13 @@ const MAX_DESCRIPTION_LEN: usize = 4096;
 pub fn format_analysis_embed(result: &AnalysisResult) -> CreateEmbed {
     let (title, description, colour) = if let Some(error) = &result.error {
         (
-            format!("📊 Game Analysis — {}", result.champion_name),
-            format!("⚠️ Analysis unavailable: {error}"),
+            format!("📊 Analyse de partie — {}", result.champion_name),
+            format!("⚠️ Analyse indisponible : {error}"),
             Colour::from_rgb(149, 165, 166),
         )
     } else {
         (
-            format!("📊 Game Analysis — {}", result.champion_name),
+            format!("📊 Analyse de partie — {}", result.champion_name),
             result.summary.clone(),
             rating_colour(result.overall_rating.as_deref()),
         )
@@ -23,17 +23,17 @@ pub fn format_analysis_embed(result: &AnalysisResult) -> CreateEmbed {
         .title(title)
         .description(truncate_description(&description))
         .colour(colour)
-        .footer(CreateEmbedFooter::new("Powered by Gemini Flash Lite"))
+        .footer(CreateEmbedFooter::new("Propulsé par Gemini Flash Lite"))
 }
 
 pub fn format_analysis_error_embed(summoner_name: &str, error_msg: &str) -> CreateEmbed {
     CreateEmbed::new()
-        .title(format!("📊 Game Analysis — {summoner_name}"))
+        .title(format!("📊 Analyse de partie — {summoner_name}"))
         .description(truncate_description(&format!(
-            "⚠️ Analysis unavailable: {error_msg}"
+            "⚠️ Analyse indisponible : {error_msg}"
         )))
         .colour(Colour::from_rgb(149, 165, 166))
-        .footer(CreateEmbedFooter::new("Powered by Gemini Flash Lite"))
+        .footer(CreateEmbedFooter::new("Propulsé par Gemini Flash Lite"))
 }
 
 fn rating_colour(rating: Option<&str>) -> Colour {
@@ -100,13 +100,11 @@ mod tests {
             value.get("color"),
             Some(&serde_json::json!(Colour::from_rgb(149, 165, 166).0))
         );
-        assert!(
-            value
-                .get("description")
-                .and_then(|desc| desc.as_str())
-                .unwrap_or_default()
-                .contains("Analysis unavailable")
-        );
+        assert!(value
+            .get("description")
+            .and_then(|desc| desc.as_str())
+            .unwrap_or_default()
+            .contains("Analyse indisponible"));
     }
 
     #[test]
@@ -115,7 +113,7 @@ mod tests {
         let value = serde_json::to_value(embed).expect("serialize embed");
         assert_eq!(
             value.get("title"),
-            Some(&serde_json::json!("📊 Game Analysis — Summoner"))
+            Some(&serde_json::json!("📊 Analyse de partie — Summoner"))
         );
         assert_eq!(
             value.get("color"),
