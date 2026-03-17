@@ -13,7 +13,7 @@ pub struct Config {
     pub default_region: String,
     pub polling_interval_secs: u64,
     pub gemini_api_key: Option<String>,
-    pub analysis_prompt_path: String,
+    pub analysis_prompts_dir: String,
 }
 
 #[derive(Debug, Clone)]
@@ -67,12 +67,12 @@ impl Config {
             .unwrap_or(180);
 
         let gemini_api_key = env::var("GEMINI_API_KEY").ok();
-        let analysis_prompt_path =
-            env::var("ANALYSIS_PROMPT_PATH").unwrap_or_else(|_| "ANALYSIS_PROMPT.md".to_string());
+        let analysis_prompts_dir =
+            env::var("ANALYSIS_PROMPTS_DIR").unwrap_or_else(|_| "analysis_prompts".to_string());
 
         tracing::info!(
             has_gemini_api_key = gemini_api_key.is_some(),
-            analysis_prompt_path = analysis_prompt_path.as_str()
+            analysis_prompts_dir = analysis_prompts_dir.as_str()
         );
 
         Self {
@@ -86,7 +86,7 @@ impl Config {
             default_region,
             polling_interval_secs,
             gemini_api_key,
-            analysis_prompt_path,
+            analysis_prompts_dir,
         }
     }
 }

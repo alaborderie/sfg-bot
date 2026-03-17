@@ -50,7 +50,7 @@ impl Bot {
                     }
                 };
 
-                match AnalysisPipeline::new(gemini_client, &config.analysis_prompt_path) {
+                match AnalysisPipeline::new(gemini_client, &config.analysis_prompts_dir) {
                     Ok(pipeline) => Some(Arc::new(pipeline)),
                     Err(error) => {
                         tracing::warn!(error = %error, "Failed to load analysis prompt");
