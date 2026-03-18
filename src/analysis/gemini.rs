@@ -6,7 +6,7 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::time::sleep;
 
-const DEFAULT_MODEL: &str = "gemini-3.1-flash-lite";
+const DEFAULT_MODEL: &str = "gemini-3.1-flash-lite-preview";
 const MAX_ATTEMPTS: usize = 3;
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 

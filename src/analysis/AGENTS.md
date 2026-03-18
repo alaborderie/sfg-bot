@@ -19,7 +19,7 @@ AI-powered post-game analysis using Google Gemini API.
 2. Loads prompt template from file (default: `ANALYSIS_PROMPT.md`)
 3. Builds `AnalysisData` with rich context: player stats, team stats, timeline events, gold/xp diffs
 4. Interpolates data into prompt template
-5. Sends to Gemini API (`gemini-3.1-flash-lite` model)
+5. Sends to Gemini API (`gemini-3.1-flash-lite-preview` model)
 6. Parses response: extracts rating line (Good/Average/Poor) + summary text
 7. Returns `AnalysisResult` for embed formatting
 
