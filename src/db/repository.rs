@@ -399,11 +399,10 @@ impl Repository for PgRepository {
     }
 
     async fn get_bot_config(&self, guild_id: i64) -> Result<Option<BotConfig>, RepositoryError> {
-        let config =
-            sqlx::query_as::<_, BotConfig>("SELECT * FROM bot_config WHERE guild_id = $1")
-                .bind(guild_id)
-                .fetch_optional(&self.pool)
-                .await?;
+        let config = sqlx::query_as::<_, BotConfig>("SELECT * FROM bot_config WHERE guild_id = $1")
+            .bind(guild_id)
+            .fetch_optional(&self.pool)
+            .await?;
         Ok(config)
     }
 

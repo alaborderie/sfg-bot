@@ -15,11 +15,7 @@ pub struct NotificationProcessor {
 }
 
 impl NotificationProcessor {
-    pub fn new(
-        repository: Arc<dyn Repository>,
-        ctx: Context,
-        interval_secs: u64,
-    ) -> Self {
+    pub fn new(repository: Arc<dyn Repository>, ctx: Context, interval_secs: u64) -> Self {
         Self {
             repository,
             ctx,
@@ -131,9 +127,7 @@ impl NotificationProcessor {
         let embed = format_grouped_game_started(&summoners, &champions, game_mode, queue_id);
         let builder = CreateMessage::new().embed(embed);
 
-        channel_id
-            .send_message(&self.ctx.http, builder)
-            .await?;
+        channel_id.send_message(&self.ctx.http, builder).await?;
 
         self.repository
             .mark_notifications_processed(&event_ids)
@@ -166,9 +160,7 @@ impl NotificationProcessor {
         let embed = format_grouped_game_ended(&summoners, &events, game_mode);
         let builder = CreateMessage::new().embed(embed);
 
-        channel_id
-            .send_message(&self.ctx.http, builder)
-            .await?;
+        channel_id.send_message(&self.ctx.http, builder).await?;
 
         self.repository
             .mark_notifications_processed(&event_ids)
@@ -197,9 +189,7 @@ impl NotificationProcessor {
 
     async fn get_notification_channel(&self) -> Option<ChannelId> {
         match self.repository.get_all_bot_configs().await {
-            Ok(configs) => configs
-                .first()
-                .map(|c| ChannelId::new(c.channel_id as u64)),
+            Ok(configs) => configs.first().map(|c| ChannelId::new(c.channel_id as u64)),
             Err(e) => {
                 tracing::error!("Failed to fetch bot config: {}", e);
                 None

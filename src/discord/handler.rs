@@ -218,13 +218,8 @@ async fn start_polling_task(
             );
 
             loop {
-                if let Err(e) = check_and_notify(
-                    &ctx,
-                    &tracker,
-                    &summoner,
-                    analysis_pipeline.clone(),
-                )
-                .await
+                if let Err(e) =
+                    check_and_notify(&ctx, &tracker, &summoner, analysis_pipeline.clone()).await
                 {
                     tracing::error!(
                         "Error checking summoner {}#{}: {}",

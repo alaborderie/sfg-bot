@@ -40,8 +40,7 @@ fn register_init_sfg_bot() -> CreateCommand {
 }
 
 fn register_list_summoners() -> CreateCommand {
-    CreateCommand::new("list-summoners")
-        .description("Affiche la liste des invocateurs suivis")
+    CreateCommand::new("list-summoners").description("Affiche la liste des invocateurs suivis")
 }
 
 fn register_add_summoner() -> CreateCommand {
@@ -143,7 +142,9 @@ pub async fn run_list_summoners(
                     &ctx.http,
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
-                            .content("❌ Erreur lors de la récupération de la liste des invocateurs.")
+                            .content(
+                                "❌ Erreur lors de la récupération de la liste des invocateurs.",
+                            )
                             .ephemeral(true),
                     ),
                 )
@@ -153,11 +154,15 @@ pub async fn run_list_summoners(
     };
 
     let content = if summoners.is_empty() {
-        "📋 Aucun invocateur suivi pour le moment.\nUtilise `/add-summoner` pour en ajouter.".to_string()
+        "📋 Aucun invocateur suivi pour le moment.\nUtilise `/add-summoner` pour en ajouter."
+            .to_string()
     } else {
         let mut lines = vec![format!("📋 **Invocateurs suivis ({})** :", summoners.len())];
         for summoner in &summoners {
-            lines.push(format!("• **{}#{}** ({})", summoner.game_name, summoner.tag_line, summoner.region));
+            lines.push(format!(
+                "• **{}#{}** ({})",
+                summoner.game_name, summoner.tag_line, summoner.region
+            ));
         }
         lines.join("\n")
     };
