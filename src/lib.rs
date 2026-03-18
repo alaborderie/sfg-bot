@@ -5,7 +5,7 @@ pub mod discord;
 pub mod notification;
 pub mod riot;
 
-pub use config::{Config, ConfigError, SummonerConfig, parse_summoner_names};
+pub use config::{Config, ConfigError};
 pub use db::repository::{PgRepository, Repository, RepositoryError};
 pub use riot::client::{RiotApiClient, RiotClient, RiotClientError};
 pub use riot::tracker::{GameTracker, TrackerError};

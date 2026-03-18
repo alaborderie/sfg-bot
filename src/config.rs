@@ -6,18 +6,11 @@ pub struct Config {
     pub riot_api_key: String,
     pub discord_bot_token: String,
     pub discord_bot_id: u64,
-    pub summoner_names: Vec<SummonerConfig>,
     pub database_url: String,
     pub default_region: String,
     pub polling_interval_secs: u64,
     pub gemini_api_key: Option<String>,
     pub analysis_prompts_dir: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct SummonerConfig {
-    pub name: String,
-    pub tag: String,
 }
 
 #[derive(Debug, Error)]
@@ -26,8 +19,6 @@ pub enum ConfigError {
     MissingEnvVar(String),
     #[error("Invalid environment variable value for {0}: {1}")]
     InvalidValue(String, String),
-    #[error("Invalid summoner name format: {0}")]
-    InvalidSummonerFormat(String),
 }
 
 impl Config {
@@ -44,10 +35,6 @@ impl Config {
             .expect("DISCORD_BOT_ID must be set")
             .parse()
             .expect("DISCORD_BOT_ID must be a valid u64");
-
-        let summoner_names_raw = env::var("SUMMONER_NAMES").expect("SUMMONER_NAMES must be set");
-        let summoner_names =
-            parse_summoner_names(&summoner_names_raw).expect("SUMMONER_NAMES must be valid format");
 
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
         let default_region = env::var("DEFAULT_REGION").unwrap_or_else(|_| "euw1".to_string());
@@ -69,7 +56,6 @@ impl Config {
             riot_api_key,
             discord_bot_token,
             discord_bot_id,
-            summoner_names,
             database_url,
             default_region,
             polling_interval_secs,
@@ -77,55 +63,4 @@ impl Config {
             analysis_prompts_dir,
         }
     }
-}
-
-pub fn parse_summoner_names(input: &str) -> Result<Vec<SummonerConfig>, ConfigError> {
-    if input.trim().is_empty() {
-        return Ok(Vec::new());
-    }
-
-    input
-        .split('|')
-        .map(|entry| {
-            let entry = entry.trim();
-            let hash_pos = entry
-                .rfind('#')
-                .ok_or_else(|| ConfigError::InvalidSummonerFormat(entry.to_string()))?;
-
-            let name = entry[..hash_pos].trim().to_string();
-            let tag = entry[hash_pos + 1..].trim().to_string();
-
-            if name.is_empty() || tag.is_empty() {
-                return Err(ConfigError::InvalidSummonerFormat(entry.to_string()));
-            }
-
-            if !is_valid_summoner_name(&name) {
-                return Err(ConfigError::InvalidSummonerFormat(format!(
-                    "Invalid name: {}",
-                    name
-                )));
-            }
-
-            if !is_valid_tag(&tag) {
-                return Err(ConfigError::InvalidSummonerFormat(format!(
-                    "Invalid tag: {}",
-                    tag
-                )));
-            }
-
-            Ok(SummonerConfig { name, tag })
-        })
-        .collect()
-}
-
-fn is_valid_summoner_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 24
-        && name
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == ' ' || c == '-' || c == '_')
-}
-
-fn is_valid_tag(tag: &str) -> bool {
-    !tag.is_empty() && tag.len() <= 5 && tag.chars().all(|c| c.is_alphanumeric())
 }

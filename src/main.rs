@@ -24,10 +24,7 @@ async fn main() {
 
     // Load configuration
     let config = Config::from_env();
-    tracing::info!(
-        "Loaded configuration with {} summoners",
-        config.summoner_names.len()
-    );
+    tracing::info!("Configuration loaded");
 
     // Create database pool
     let db_pool = db::create_pool(&config.database_url)
@@ -72,50 +69,6 @@ async fn main() {
                 "Failed to fetch champion data: {}. Champion names will fall back to IDs.",
                 e
             );
-        }
-    }
-
-    for summoner_config in &config.summoner_names {
-        match riot_client
-            .get_account_by_riot_id(
-                &summoner_config.name,
-                &summoner_config.tag,
-                RiotClient::regional_for_region(&config.default_region),
-            )
-            .await
-        {
-            Ok(summoner_info) => {
-                if let Err(e) = repository
-                    .upsert_summoner(
-                        &summoner_info.puuid,
-                        &summoner_info.game_name,
-                        &summoner_info.tag_line,
-                        &config.default_region,
-                    )
-                    .await
-                {
-                    tracing::error!(
-                        "Failed to upsert summoner {}#{}: {}",
-                        summoner_config.name,
-                        summoner_config.tag,
-                        e
-                    );
-                } else {
-                    tracing::info!(
-                        "Registered summoner: {}#{}",
-                        summoner_info.game_name,
-                        summoner_info.tag_line
-                    );
-                }
-            }
-            Err(e) => {
-                tracing::error!(
-                    "Failed to resolve summoner {}#{}: {}",
-                    summoner_config.name,
-                    summoner_config.tag,
-                    e
-                );
-            }
         }
     }
 
