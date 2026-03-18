@@ -93,6 +93,12 @@ pub trait Repository: Send + Sync {
     async fn get_bot_config(&self, guild_id: i64) -> Result<Option<BotConfig>, RepositoryError>;
 
     async fn get_all_bot_configs(&self) -> Result<Vec<BotConfig>, RepositoryError>;
+
+    async fn delete_summoner_by_name_and_tag(
+        &self,
+        game_name: &str,
+        tag_line: &str,
+    ) -> Result<bool, RepositoryError>;
 }
 
 pub struct PgRepository {
@@ -406,5 +412,20 @@ impl Repository for PgRepository {
             .fetch_all(&self.pool)
             .await?;
         Ok(configs)
+    }
+
+    async fn delete_summoner_by_name_and_tag(
+        &self,
+        game_name: &str,
+        tag_line: &str,
+    ) -> Result<bool, RepositoryError> {
+        let result = sqlx::query(
+            "DELETE FROM summoners WHERE LOWER(game_name) = LOWER($1) AND LOWER(tag_line) = LOWER($2)",
+        )
+        .bind(game_name)
+        .bind(tag_line)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
     }
 }
