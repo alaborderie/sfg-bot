@@ -1,5 +1,6 @@
 use crate::analysis::discord::{format_analysis_embed, format_analysis_error_embed};
 use crate::analysis::pipeline::AnalysisPipeline;
+use crate::db::repository::Repository;
 use crate::notification::messages::format_single_game_ended;
 use crate::riot::client::{RiotApiClient, RiotClient};
 use serenity::builder::{
@@ -10,7 +11,11 @@ use serenity::model::application::{CommandOptionType, ResolvedValue};
 use serenity::prelude::*;
 use std::sync::Arc;
 
-pub fn register() -> CreateCommand {
+pub fn register_all() -> Vec<CreateCommand> {
+    vec![register_analyze_last_game(), register_init_sfg_bot()]
+}
+
+fn register_analyze_last_game() -> CreateCommand {
     CreateCommand::new("analyze-last-game")
         .description("Analyse la dernière partie d'un invocateur")
         .add_option(
@@ -21,6 +26,70 @@ pub fn register() -> CreateCommand {
             )
             .required(true),
         )
+}
+
+fn register_init_sfg_bot() -> CreateCommand {
+    CreateCommand::new("init-sfg-bot")
+        .description("Configure ce salon comme salon de notifications du bot")
+}
+
+pub async fn run_init_sfg_bot(
+    ctx: &Context,
+    command: &serenity::model::application::CommandInteraction,
+    repository: &Arc<dyn Repository>,
+) {
+    let Some(guild_id) = command.guild_id else {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Cette commande ne peut être utilisée que dans un serveur.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    };
+
+    let channel_id = command.channel_id;
+
+    match repository
+        .upsert_bot_config(guild_id.get() as i64, channel_id.get() as i64)
+        .await
+    {
+        Ok(_) => {
+            tracing::info!(
+                guild_id = guild_id.get(),
+                channel_id = channel_id.get(),
+                "Bot config saved via /init-sfg-bot"
+            );
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new().content(format!(
+                            "✅ Notifications configurées dans <#{}>. Les alertes de parties seront envoyées ici !",
+                            channel_id.get()
+                        )),
+                    ),
+                )
+                .await;
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to save bot config");
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content("❌ Erreur lors de la sauvegarde de la configuration.")
+                            .ephemeral(true),
+                    ),
+                )
+                .await;
+        }
+    }
 }
 
 pub async fn run(

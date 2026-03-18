@@ -17,7 +17,7 @@ use serenity::builder::CreateMessage;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
-use serenity::model::id::{ChannelId, GuildId};
+use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
@@ -78,21 +78,22 @@ impl EventHandler for Bot {
     async fn ready(&self, ctx: Context, ready: Ready) {
         tracing::info!("Bot ready as {}", ready.user.name);
 
-        let guild_id = GuildId::new(self.config.discord_server_id);
-        match guild_id
-            .set_commands(&ctx.http, vec![commands::register()])
-            .await
+        match serenity::model::application::Command::set_global_commands(
+            &ctx.http,
+            commands::register_all(),
+        )
+        .await
         {
             Ok(cmds) => {
-                tracing::info!("Registered {} slash command(s)", cmds.len());
+                tracing::info!("Registered {} global slash command(s)", cmds.len());
             }
             Err(e) => {
-                tracing::error!("Failed to register slash commands: {}", e);
+                tracing::error!("Failed to register global slash commands: {}", e);
             }
         }
     }
 
-    async fn cache_ready(&self, ctx: Context, _guilds: Vec<GuildId>) {
+    async fn cache_ready(&self, ctx: Context, _guilds: Vec<serenity::model::id::GuildId>) {
         tracing::info!("Cache ready, starting background tasks");
 
         let repository = self.repository.clone();
@@ -113,12 +114,10 @@ impl EventHandler for Bot {
         });
 
         let repository = self.repository.clone();
-        let config = self.config.clone();
         let ctx_clone = ctx.clone();
 
         tokio::spawn(async move {
-            let channel_id = ChannelId::new(config.discord_channel_id);
-            let processor = NotificationProcessor::new(repository, ctx_clone, channel_id, 5);
+            let processor = NotificationProcessor::new(repository, ctx_clone, 5);
             processor.start().await;
         });
     }
@@ -135,6 +134,9 @@ impl EventHandler for Bot {
                         &self.config.default_region,
                     )
                     .await;
+                }
+                "init-sfg-bot" => {
+                    commands::run_init_sfg_bot(&ctx, &command, &self.repository).await;
                 }
                 _ => {
                     tracing::warn!("Unknown slash command: {}", command.data.name);
@@ -169,7 +171,6 @@ async fn start_polling_task(
     config: Config,
     analysis_pipeline: Option<Arc<AnalysisPipeline>>,
 ) {
-    let channel_id = ChannelId::new(config.discord_channel_id);
     let interval_secs = config.polling_interval_secs;
 
     let summoners = match repository.get_all_summoners().await {
@@ -205,7 +206,6 @@ async fn start_polling_task(
                     &ctx,
                     &tracker,
                     &summoner,
-                    channel_id,
                     analysis_pipeline.clone(),
                 )
                 .await
@@ -234,11 +234,10 @@ async fn start_polling_task(
     }
 }
 
-async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Sized>(
+async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Sized + 'static>(
     ctx: &Context,
     tracker: &GameTracker<R, D>,
     summoner: &Summoner,
-    channel_id: ChannelId,
     analysis_pipeline: Option<Arc<AnalysisPipeline>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state_change = tracker.check_summoner_game_state(summoner).await?;
@@ -341,7 +340,6 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
                         tracker,
                         &summoner_clone,
                         &match_id,
-                        channel_id,
                         analysis_pipeline.clone(),
                     );
                 }
@@ -416,7 +414,6 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
                         tracker,
                         &summoner_clone,
                         &match_id,
-                        channel_id,
                         analysis_pipeline.clone(),
                     );
                 }
@@ -444,12 +441,11 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
     Ok(())
 }
 
-fn spawn_analysis_task<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Sized>(
+fn spawn_analysis_task<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Sized + 'static>(
     ctx: &Context,
     tracker: &GameTracker<R, D>,
     summoner: &Summoner,
     match_id: &str,
-    channel_id: ChannelId,
     analysis_pipeline: Option<Arc<AnalysisPipeline>>,
 ) {
     let Some(analysis_pipeline) = analysis_pipeline else {
@@ -458,6 +454,7 @@ fn spawn_analysis_task<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Siz
 
     let ctx = ctx.clone();
     let riot_client = tracker.riot_client();
+    let repository = tracker.repository.clone();
     let summoner_clone = summoner.clone();
     let match_id = match_id.to_string();
     let region = RiotClient::regional_for_region(tracker.default_region());
@@ -465,6 +462,23 @@ fn spawn_analysis_task<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Siz
 
     tokio::spawn(async move {
         let summoner_name = format!("{}#{}", summoner_clone.game_name, summoner_clone.tag_line);
+
+        let channel_id = match repository.get_all_bot_configs().await {
+            Ok(configs) => match configs.first() {
+                Some(c) => ChannelId::new(c.channel_id as u64),
+                None => {
+                    tracing::warn!(
+                        "No notification channel configured, skipping analysis for {}",
+                        summoner_name
+                    );
+                    return;
+                }
+            },
+            Err(e) => {
+                tracing::error!("Failed to fetch bot config for analysis: {}", e);
+                return;
+            }
+        };
 
         let analysis_data = riot_client
             .get_match_analysis_data(
