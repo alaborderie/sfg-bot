@@ -6,8 +6,6 @@ pub struct Config {
     pub riot_api_key: String,
     pub discord_bot_token: String,
     pub discord_bot_id: u64,
-    pub discord_server_id: u64,
-    pub discord_channel_id: u64,
     pub summoner_names: Vec<SummonerConfig>,
     pub database_url: String,
     pub default_region: String,
@@ -46,14 +44,6 @@ impl Config {
             .expect("DISCORD_BOT_ID must be set")
             .parse()
             .expect("DISCORD_BOT_ID must be a valid u64");
-        let discord_server_id = env::var("DISCORD_SERVER_ID")
-            .expect("DISCORD_SERVER_ID must be set")
-            .parse()
-            .expect("DISCORD_SERVER_ID must be a valid u64");
-        let discord_channel_id = env::var("DISCORD_CHANNEL_ID")
-            .expect("DISCORD_CHANNEL_ID must be set")
-            .parse()
-            .expect("DISCORD_CHANNEL_ID must be a valid u64");
 
         let summoner_names_raw = env::var("SUMMONER_NAMES").expect("SUMMONER_NAMES must be set");
         let summoner_names =
@@ -79,8 +69,6 @@ impl Config {
             riot_api_key,
             discord_bot_token,
             discord_bot_id,
-            discord_server_id,
-            discord_channel_id,
             summoner_names,
             database_url,
             default_region,

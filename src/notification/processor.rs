@@ -11,7 +11,6 @@ use std::time::Duration;
 pub struct NotificationProcessor {
     repository: Arc<dyn Repository>,
     ctx: Context,
-    channel_id: ChannelId,
     interval_secs: u64,
 }
 
@@ -19,13 +18,11 @@ impl NotificationProcessor {
     pub fn new(
         repository: Arc<dyn Repository>,
         ctx: Context,
-        channel_id: ChannelId,
         interval_secs: u64,
     ) -> Self {
         Self {
             repository,
             ctx,
-            channel_id,
             interval_secs,
         }
     }
@@ -46,6 +43,14 @@ impl NotificationProcessor {
         if events.is_empty() {
             return Ok(());
         }
+
+        let channel_id = match self.get_notification_channel().await {
+            Some(id) => id,
+            None => {
+                tracing::debug!("No notification channel configured, skipping event processing");
+                return Ok(());
+            }
+        };
 
         let now = chrono::Utc::now();
         let wait_threshold = Duration::from_secs(30);
@@ -80,13 +85,19 @@ impl NotificationProcessor {
         }
 
         for (game_id, group_events) in game_started_groups {
-            if let Err(e) = self.send_grouped_game_started(game_id, group_events).await {
+            if let Err(e) = self
+                .send_grouped_game_started(game_id, group_events, channel_id)
+                .await
+            {
                 tracing::error!("Failed to send grouped game started notification: {}", e);
             }
         }
 
         for (match_id, group_events) in game_ended_groups {
-            if let Err(e) = self.send_grouped_game_ended(&match_id, group_events).await {
+            if let Err(e) = self
+                .send_grouped_game_ended(&match_id, group_events, channel_id)
+                .await
+            {
                 tracing::error!("Failed to send grouped game ended notification: {}", e);
             }
         }
@@ -98,6 +109,7 @@ impl NotificationProcessor {
         &self,
         game_id: i64,
         events: Vec<NotificationEvent>,
+        channel_id: ChannelId,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let summoner_ids: Vec<_> = events.iter().map(|e| e.summoner_id).collect();
         let event_ids: Vec<_> = events.iter().map(|e| e.id).collect();
@@ -119,7 +131,7 @@ impl NotificationProcessor {
         let embed = format_grouped_game_started(&summoners, &champions, game_mode, queue_id);
         let builder = CreateMessage::new().embed(embed);
 
-        self.channel_id
+        channel_id
             .send_message(&self.ctx.http, builder)
             .await?;
 
@@ -140,6 +152,7 @@ impl NotificationProcessor {
         &self,
         match_id: &str,
         events: Vec<NotificationEvent>,
+        channel_id: ChannelId,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let summoner_ids: Vec<_> = events.iter().map(|e| e.summoner_id).collect();
         let event_ids: Vec<_> = events.iter().map(|e| e.id).collect();
@@ -153,7 +166,7 @@ impl NotificationProcessor {
         let embed = format_grouped_game_ended(&summoners, &events, game_mode);
         let builder = CreateMessage::new().embed(embed);
 
-        self.channel_id
+        channel_id
             .send_message(&self.ctx.http, builder)
             .await?;
 
@@ -180,5 +193,17 @@ impl NotificationProcessor {
             .filter(|s| summoner_ids.contains(&s.id))
             .collect();
         Ok(summoners)
+    }
+
+    async fn get_notification_channel(&self) -> Option<ChannelId> {
+        match self.repository.get_all_bot_configs().await {
+            Ok(configs) => configs
+                .first()
+                .map(|c| ChannelId::new(c.channel_id as u64)),
+            Err(e) => {
+                tracing::error!("Failed to fetch bot config: {}", e);
+                None
+            }
+        }
     }
 }
