@@ -1,6 +1,6 @@
 use crate::db::models::{
-    ActiveGame, Champion, MatchHistory, NewActiveGame, NewMatchResult, NewNotificationEvent,
-    NotificationEvent, Summoner,
+    ActiveGame, BotConfig, Champion, MatchHistory, NewActiveGame, NewMatchResult,
+    NewNotificationEvent, NotificationEvent, Summoner,
 };
 use async_trait::async_trait;
 use sqlx::PgPool;
@@ -83,6 +83,16 @@ pub trait Repository: Send + Sync {
 
     async fn mark_notifications_processed(&self, event_ids: &[Uuid])
     -> Result<(), RepositoryError>;
+
+    async fn upsert_bot_config(
+        &self,
+        guild_id: i64,
+        channel_id: i64,
+    ) -> Result<BotConfig, RepositoryError>;
+
+    async fn get_bot_config(&self, guild_id: i64) -> Result<Option<BotConfig>, RepositoryError>;
+
+    async fn get_all_bot_configs(&self) -> Result<Vec<BotConfig>, RepositoryError>;
 }
 
 pub struct PgRepository {
@@ -358,5 +368,43 @@ impl Repository for PgRepository {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    async fn upsert_bot_config(
+        &self,
+        guild_id: i64,
+        channel_id: i64,
+    ) -> Result<BotConfig, RepositoryError> {
+        let config = sqlx::query_as::<_, BotConfig>(
+            r#"
+            INSERT INTO bot_config (guild_id, channel_id)
+            VALUES ($1, $2)
+            ON CONFLICT (guild_id) DO UPDATE SET
+                channel_id = EXCLUDED.channel_id,
+                updated_at = NOW()
+            RETURNING id, guild_id, channel_id, created_at, updated_at
+            "#,
+        )
+        .bind(guild_id)
+        .bind(channel_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(config)
+    }
+
+    async fn get_bot_config(&self, guild_id: i64) -> Result<Option<BotConfig>, RepositoryError> {
+        let config =
+            sqlx::query_as::<_, BotConfig>("SELECT * FROM bot_config WHERE guild_id = $1")
+                .bind(guild_id)
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(config)
+    }
+
+    async fn get_all_bot_configs(&self) -> Result<Vec<BotConfig>, RepositoryError> {
+        let configs = sqlx::query_as::<_, BotConfig>("SELECT * FROM bot_config")
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(configs)
     }
 }

@@ -148,3 +148,12 @@ pub struct NewNotificationEvent {
     pub enemy_gold: Option<i32>,
     pub enemy_damage: Option<i32>,
 }
+
+#[derive(Debug, Clone, FromRow)]
+pub struct BotConfig {
+    pub id: Uuid,
+    pub guild_id: i64,
+    pub channel_id: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
