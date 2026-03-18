@@ -82,12 +82,12 @@ All config via environment variables (see `.env.example`):
 |---|---|---|
 | `DISCORD_BOT_ID` | Yes | Bot application ID |
 | `DISCORD_TOKEN` | Yes | Bot authentication token |
-| `DISCORD_SERVER_ID` | Yes | Target guild ID |
-| `DISCORD_CHANNEL_ID` | Yes | Notification channel ID |
 | `RIOT_API_KEY` | Yes | Riot Games API key |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `SUMMONER_NAMES` | Yes | Comma-separated `name#tag` list |
 | `POLLING_INTERVAL_SECS` | No | Polling frequency (default in config) |
 | `GEMINI_API_KEY` | No | Enables AI analysis |
-| `ANALYSIS_PROMPT_PATH` | No | Custom prompt template path |
+| `ANALYSIS_PROMPTS_DIR` | No | Directory with role-specific prompts (default: `analysis_prompts`) |
 | `DEFAULT_REGION` | No | Riot API region routing |
+
+**Note:** Notification channel is configured at runtime via the `/init-sfg-bot` slash command (stored in `bot_config` DB table).
