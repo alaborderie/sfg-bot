@@ -18,7 +18,7 @@ Discord bot that tracks SouthFoxGaming League of Legends games — detects game 
 
 ### Core Flow
 
-1. **main.rs** — Init tracing, load config from env, create DB pool, run migrations, cache champions, resolve summoner PUUIDs, start Discord client
+1. **main.rs** — Init tracing, load config from env, create DB pool, run migrations, cache champions, start Discord client
 2. **Per-summoner polling** — Each tracked summoner gets a `tokio::spawn` loop that polls Riot API for active games
 3. **State machine** — `GameTracker` detects `GameStarted`, `GameEnded`, `FeaturedModeGameEnded`, `NoChange`
 4. **Event queue** — State changes insert `NotificationEvent` rows into PostgreSQL
@@ -41,7 +41,7 @@ Discord bot that tracks SouthFoxGaming League of Legends games — detects game 
 | `db/` | PostgreSQL pool, repository trait + impl, DB models |
 | `notification/` | Event processor, Discord embed builders |
 | `analysis/` | Gemini client, analysis data models, prompt pipeline, embed formatters |
-| `config.rs` | Env var parsing, summoner name config |
+| `config.rs` | Env var parsing |
 
 ## Conventions
 
@@ -57,15 +57,15 @@ Discord bot that tracks SouthFoxGaming League of Legends games — detects game 
 ### Testing
 
 - **Unit tests** — Inline `#[cfg(test)] mod tests` in: `riot/client.rs`, `analysis/gemini.rs`, `analysis/pipeline.rs`, `analysis/discord.rs`
-- **Integration tests** — `tests/` directory (9 files): messages, notification_messages, models, tracker, tracker_error, config, config_error, riot_error, riot_client
+- **Integration tests** — `tests/` directory (8 files): messages, notification_messages, models, tracker, tracker_error, config_error, riot_error, riot_client
 - **Mock system** — `mockall` behind `test-mocks` feature flag; mocks for `Repository` and `RiotApiClient`
 - **Run**: `cargo test --features test-mocks`
 
 ### Database
 
-- **Migrations** — `migrations/` directory (7 migrations), run automatically on startup via `sqlx::migrate!()`
+- **Migrations** — `migrations/` directory (8 migrations), run automatically on startup via `sqlx::migrate!()`
 - **Offline mode** — `SQLX_OFFLINE=true` in CI; update with `cargo sqlx prepare`
-- **Schema** — summoners, active_games, match_history, champions, notification_events tables
+- **Schema** — summoners, active_games, match_history, champions, notification_events, bot_config tables
 - **Pool** — max 5 connections (PgPoolOptions)
 
 ### CI/CD
@@ -84,10 +84,10 @@ All config via environment variables (see `.env.example`):
 | `DISCORD_TOKEN` | Yes | Bot authentication token |
 | `RIOT_API_KEY` | Yes | Riot Games API key |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `SUMMONER_NAMES` | Yes | Comma-separated `name#tag` list |
 | `POLLING_INTERVAL_SECS` | No | Polling frequency (default in config) |
 | `GEMINI_API_KEY` | No | Enables AI analysis |
 | `ANALYSIS_PROMPTS_DIR` | No | Directory with role-specific prompts (default: `analysis_prompts`) |
 | `DEFAULT_REGION` | No | Riot API region routing |
 
 **Note:** Notification channel is configured at runtime via the `/init-sfg-bot` slash command (stored in `bot_config` DB table).
+Summoners are managed at runtime via `/add-summoner`, `/remove-summoner`, and `/list-summoners` slash commands (stored in `summoners` DB table).
