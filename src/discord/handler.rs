@@ -138,6 +138,22 @@ impl EventHandler for Bot {
                 "init-sfg-bot" => {
                     commands::run_init_sfg_bot(&ctx, &command, &self.repository).await;
                 }
+                "list-summoners" => {
+                    commands::run_list_summoners(&ctx, &command, &self.repository).await;
+                }
+                "add-summoner" => {
+                    commands::run_add_summoner(
+                        &ctx,
+                        &command,
+                        &self.repository,
+                        &self.riot_client,
+                        &self.config.default_region,
+                    )
+                    .await;
+                }
+                "remove-summoner" => {
+                    commands::run_remove_summoner(&ctx, &command, &self.repository).await;
+                }
                 _ => {
                     tracing::warn!("Unknown slash command: {}", command.data.name);
                 }

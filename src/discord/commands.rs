@@ -12,7 +12,13 @@ use serenity::prelude::*;
 use std::sync::Arc;
 
 pub fn register_all() -> Vec<CreateCommand> {
-    vec![register_analyze_last_game(), register_init_sfg_bot()]
+    vec![
+        register_analyze_last_game(),
+        register_init_sfg_bot(),
+        register_list_summoners(),
+        register_add_summoner(),
+        register_remove_summoner(),
+    ]
 }
 
 fn register_analyze_last_game() -> CreateCommand {
@@ -31,6 +37,37 @@ fn register_analyze_last_game() -> CreateCommand {
 fn register_init_sfg_bot() -> CreateCommand {
     CreateCommand::new("init-sfg-bot")
         .description("Configure ce salon comme salon de notifications du bot")
+}
+
+fn register_list_summoners() -> CreateCommand {
+    CreateCommand::new("list-summoners")
+        .description("Affiche la liste des invocateurs suivis")
+}
+
+fn register_add_summoner() -> CreateCommand {
+    CreateCommand::new("add-summoner")
+        .description("Ajoute un invocateur à la liste de suivi")
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "summoner_name",
+                "Nom d'invocateur au format : Nom#Tag",
+            )
+            .required(true),
+        )
+}
+
+fn register_remove_summoner() -> CreateCommand {
+    CreateCommand::new("remove-summoner")
+        .description("Retire un invocateur de la liste de suivi")
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "summoner_name",
+                "Nom d'invocateur au format : Nom#Tag",
+            )
+            .required(true),
+        )
 }
 
 pub async fn run_init_sfg_bot(
@@ -84,6 +121,303 @@ pub async fn run_init_sfg_bot(
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
                             .content("❌ Erreur lors de la sauvegarde de la configuration.")
+                            .ephemeral(true),
+                    ),
+                )
+                .await;
+        }
+    }
+}
+
+pub async fn run_list_summoners(
+    ctx: &Context,
+    command: &serenity::model::application::CommandInteraction,
+    repository: &Arc<dyn Repository>,
+) {
+    let summoners = match repository.get_all_summoners().await {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to fetch summoners");
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content("❌ Erreur lors de la récupération de la liste des invocateurs.")
+                            .ephemeral(true),
+                    ),
+                )
+                .await;
+            return;
+        }
+    };
+
+    let content = if summoners.is_empty() {
+        "📋 Aucun invocateur suivi pour le moment.\nUtilise `/add-summoner` pour en ajouter.".to_string()
+    } else {
+        let mut lines = vec![format!("📋 **Invocateurs suivis ({})** :", summoners.len())];
+        for summoner in &summoners {
+            lines.push(format!("• **{}#{}** ({})", summoner.game_name, summoner.tag_line, summoner.region));
+        }
+        lines.join("\n")
+    };
+
+    let _ = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().content(content),
+            ),
+        )
+        .await;
+}
+
+pub async fn run_add_summoner(
+    ctx: &Context,
+    command: &serenity::model::application::CommandInteraction,
+    repository: &Arc<dyn Repository>,
+    riot_client: &Arc<dyn RiotApiClient>,
+    default_region: &str,
+) {
+    let options = command.data.options();
+    let summoner_input = options
+        .iter()
+        .find_map(|opt| {
+            if opt.name == "summoner_name" {
+                if let ResolvedValue::String(s) = opt.value {
+                    Some(s.to_string())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
+
+    if summoner_input.is_empty() {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Merci de fournir un nom d'invocateur au format : `Nom#Tag`")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
+
+    let Some(hash_pos) = summoner_input.rfind('#') else {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    };
+
+    let game_name = summoner_input[..hash_pos].trim();
+    let tag_line = summoner_input[hash_pos + 1..].trim();
+
+    if game_name.is_empty() || tag_line.is_empty() {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
+
+    let defer = CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new());
+    if let Err(e) = command.create_response(&ctx.http, defer).await {
+        tracing::error!("Failed to defer interaction: {}", e);
+        return;
+    }
+
+    let region = RiotClient::regional_for_region(default_region);
+
+    let summoner_info = match riot_client
+        .get_account_by_riot_id(game_name, tag_line, region)
+        .await
+    {
+        Ok(info) => info,
+        Err(e) => {
+            tracing::warn!(
+                summoner = summoner_input.as_str(),
+                error = %e,
+                "Failed to resolve summoner account for add-summoner"
+            );
+            let _ = command
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new().content(format!(
+                        "❌ Compte `{summoner_input}` introuvable. Vérifie le nom et le tag."
+                    )),
+                )
+                .await;
+            return;
+        }
+    };
+
+    match repository
+        .upsert_summoner(
+            &summoner_info.puuid,
+            &summoner_info.game_name,
+            &summoner_info.tag_line,
+            default_region,
+        )
+        .await
+    {
+        Ok(_) => {
+            tracing::info!(
+                game_name = summoner_info.game_name.as_str(),
+                tag_line = summoner_info.tag_line.as_str(),
+                "Summoner added via /add-summoner"
+            );
+            let _ = command
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new().content(format!(
+                        "✅ **{}#{}** ajouté à la liste de suivi !",
+                        summoner_info.game_name, summoner_info.tag_line
+                    )),
+                )
+                .await;
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to upsert summoner");
+            let _ = command
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new()
+                        .content("❌ Erreur lors de l'ajout de l'invocateur."),
+                )
+                .await;
+        }
+    }
+}
+
+pub async fn run_remove_summoner(
+    ctx: &Context,
+    command: &serenity::model::application::CommandInteraction,
+    repository: &Arc<dyn Repository>,
+) {
+    let options = command.data.options();
+    let summoner_input = options
+        .iter()
+        .find_map(|opt| {
+            if opt.name == "summoner_name" {
+                if let ResolvedValue::String(s) = opt.value {
+                    Some(s.to_string())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
+
+    if summoner_input.is_empty() {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Merci de fournir un nom d'invocateur au format : `Nom#Tag`")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
+
+    let Some(hash_pos) = summoner_input.rfind('#') else {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    };
+
+    let game_name = summoner_input[..hash_pos].trim();
+    let tag_line = summoner_input[hash_pos + 1..].trim();
+
+    if game_name.is_empty() || tag_line.is_empty() {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
+
+    match repository
+        .delete_summoner_by_name_and_tag(game_name, tag_line)
+        .await
+    {
+        Ok(true) => {
+            tracing::info!(
+                game_name = game_name,
+                tag_line = tag_line,
+                "Summoner removed via /remove-summoner"
+            );
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new().content(format!(
+                            "✅ **{game_name}#{tag_line}** retiré de la liste de suivi."
+                        )),
+                    ),
+                )
+                .await;
+        }
+        Ok(false) => {
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(format!(
+                                "❌ Invocateur `{game_name}#{tag_line}` introuvable dans la liste de suivi."
+                            ))
+                            .ephemeral(true),
+                    ),
+                )
+                .await;
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Failed to delete summoner");
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content("❌ Erreur lors de la suppression de l'invocateur.")
                             .ephemeral(true),
                     ),
                 )
