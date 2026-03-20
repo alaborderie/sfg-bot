@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
+const MAX_RETRIES: i32 = 3;
+
 pub struct NotificationProcessor {
     repository: Arc<dyn Repository>,
     ctx: Context,
@@ -127,17 +129,47 @@ impl NotificationProcessor {
         let embed = format_grouped_game_started(&summoners, &champions, game_mode, queue_id);
         let builder = CreateMessage::new().embed(embed);
 
-        channel_id.send_message(&self.ctx.http, builder).await?;
+        match channel_id.send_message(&self.ctx.http, builder).await {
+            Ok(_) => {
+                self.repository
+                    .mark_notifications_processed(&event_ids)
+                    .await?;
 
-        self.repository
-            .mark_notifications_processed(&event_ids)
-            .await?;
+                tracing::info!(
+                    "Sent grouped game started notification for game {} with {} players",
+                    game_id,
+                    events.len()
+                );
+            }
+            Err(e) => {
+                let max_retry = events.iter().map(|ev| ev.retry_count).max().unwrap_or(0);
+                let error_msg = e.to_string();
 
-        tracing::info!(
-            "Sent grouped game started notification for game {} with {} players",
-            game_id,
-            events.len()
-        );
+                if max_retry + 1 >= MAX_RETRIES {
+                    tracing::warn!(
+                        channel_id = %channel_id,
+                        retry_count = max_retry + 1,
+                        "Permanently failing game started notification for game {} after {} retries: {}",
+                        game_id, max_retry + 1, error_msg
+                    );
+                    self.repository
+                        .mark_notifications_failed(&event_ids, &error_msg)
+                        .await?;
+                } else {
+                    tracing::warn!(
+                        channel_id = %channel_id,
+                        retry_count = max_retry + 1,
+                        "Retryable failure for game started notification for game {}: {}",
+                        game_id, error_msg
+                    );
+                    self.repository
+                        .increment_notification_retry_count(&event_ids, &error_msg)
+                        .await?;
+                }
+
+                return Err(e.into());
+            }
+        }
 
         Ok(())
     }
@@ -160,17 +192,47 @@ impl NotificationProcessor {
         let embed = format_grouped_game_ended(&summoners, &events, game_mode);
         let builder = CreateMessage::new().embed(embed);
 
-        channel_id.send_message(&self.ctx.http, builder).await?;
+        match channel_id.send_message(&self.ctx.http, builder).await {
+            Ok(_) => {
+                self.repository
+                    .mark_notifications_processed(&event_ids)
+                    .await?;
 
-        self.repository
-            .mark_notifications_processed(&event_ids)
-            .await?;
+                tracing::info!(
+                    "Sent grouped game ended notification for match {} with {} players",
+                    match_id,
+                    events.len()
+                );
+            }
+            Err(e) => {
+                let max_retry = events.iter().map(|ev| ev.retry_count).max().unwrap_or(0);
+                let error_msg = e.to_string();
 
-        tracing::info!(
-            "Sent grouped game ended notification for match {} with {} players",
-            match_id,
-            events.len()
-        );
+                if max_retry + 1 >= MAX_RETRIES {
+                    tracing::warn!(
+                        channel_id = %channel_id,
+                        retry_count = max_retry + 1,
+                        "Permanently failing game ended notification for match {} after {} retries: {}",
+                        match_id, max_retry + 1, error_msg
+                    );
+                    self.repository
+                        .mark_notifications_failed(&event_ids, &error_msg)
+                        .await?;
+                } else {
+                    tracing::warn!(
+                        channel_id = %channel_id,
+                        retry_count = max_retry + 1,
+                        "Retryable failure for game ended notification for match {}: {}",
+                        match_id, error_msg
+                    );
+                    self.repository
+                        .increment_notification_retry_count(&event_ids, &error_msg)
+                        .await?;
+                }
+
+                return Err(e.into());
+            }
+        }
 
         Ok(())
     }

@@ -121,6 +121,8 @@ pub struct NotificationEvent {
     pub processed: bool,
     pub created_at: DateTime<Utc>,
     pub processed_at: Option<DateTime<Utc>>,
+    pub retry_count: i32,
+    pub error_message: Option<String>,
 }
 
 #[derive(Debug, Clone)]

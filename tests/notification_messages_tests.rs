@@ -43,6 +43,8 @@ fn create_dummy_event(win: bool) -> NotificationEvent {
         processed: false,
         created_at: Utc::now(),
         processed_at: None,
+        retry_count: 0,
+        error_message: None,
     }
 }
 
