@@ -8,6 +8,7 @@ use serenity::builder::{
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
 };
 use serenity::model::application::{CommandOptionType, ResolvedValue};
+use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
 use std::sync::Arc;
 
@@ -89,6 +90,55 @@ pub async fn run_init_sfg_bot(
     };
 
     let channel_id = command.channel_id;
+
+    let required_permissions =
+        Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::EMBED_LINKS;
+
+    let permission_check = (|| {
+        let guild = ctx.cache.guild(guild_id)?;
+        let channel = guild.channels.get(&channel_id)?.clone();
+        let bot_id = ctx.cache.current_user().id;
+        let member = guild.members.get(&bot_id)?.clone();
+        Some(guild.user_permissions_in(&channel, &member))
+    })();
+
+    match permission_check {
+        Some(permissions) if !permissions.contains(required_permissions) => {
+            let missing = required_permissions - permissions;
+            let mut missing_names = Vec::new();
+            if missing.contains(Permissions::VIEW_CHANNEL) {
+                missing_names.push("Voir le salon");
+            }
+            if missing.contains(Permissions::SEND_MESSAGES) {
+                missing_names.push("Envoyer des messages");
+            }
+            if missing.contains(Permissions::EMBED_LINKS) {
+                missing_names.push("Intégrer des liens");
+            }
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(format!(
+                                "❌ Droits manquants : {}",
+                                missing_names.join(", ")
+                            ))
+                            .ephemeral(true),
+                    ),
+                )
+                .await;
+            return;
+        }
+        None => {
+            tracing::warn!(
+                guild_id = guild_id.get(),
+                channel_id = channel_id.get(),
+                "Could not check bot permissions (guild/channel/member not in cache)"
+            );
+        }
+        _ => {}
+    }
 
     match repository
         .upsert_bot_config(guild_id.get() as i64, channel_id.get() as i64)
