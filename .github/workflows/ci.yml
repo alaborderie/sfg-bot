@@ -35,6 +35,14 @@ jobs:
   audit:
     name: Audit
     runs-on: ubuntu-latest
+    # Advisory-only — we surface RustSec findings in the run summary but
+    # don't block PR merges on transitive-dep advisories we can't fix
+    # without an upstream release (rsa Marvin Attack, rustls-webpki pinned
+    # by serenity 0.12, etc.). Re-evaluate when serenity 0.13 ships.
+    continue-on-error: true
+    permissions:
+      checks: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v2.0.0
