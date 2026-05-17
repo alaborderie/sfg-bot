@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
 use std::fs;
 use std::path::Path;
+
+use thiserror::Error;
 
 use crate::analysis::gemini::{GeminiClient, GeminiError};
 use crate::analysis::models::{AnalysisData, AnalysisResult};
@@ -18,28 +18,17 @@ const ROLE_PROMPT_FILES: &[(&str, &str)] = &[
 
 const DEFAULT_PROMPT_FILE: &str = "default.md";
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum AnalysisError {
-    GeminiError(GeminiError),
-    PromptFileError(std::io::Error),
+    #[error("Gemini error: {0}")]
+    GeminiError(#[from] GeminiError),
+    #[error("Prompt file error: {0}")]
+    PromptFileError(#[from] std::io::Error),
+    #[error("Prompt directory error: {0}")]
     PromptDirError(String),
-    SerializationError(serde_json::Error),
+    #[error("Serialization error: {0}")]
+    SerializationError(#[from] serde_json::Error),
 }
-
-impl fmt::Display for AnalysisError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AnalysisError::GeminiError(error) => write!(f, "Gemini error: {error}"),
-            AnalysisError::PromptFileError(error) => write!(f, "Prompt file error: {error}"),
-            AnalysisError::PromptDirError(message) => {
-                write!(f, "Prompt directory error: {message}")
-            }
-            AnalysisError::SerializationError(error) => write!(f, "Serialization error: {error}"),
-        }
-    }
-}
-
-impl Error for AnalysisError {}
 
 #[derive(Clone)]
 pub struct AnalysisPipeline {
@@ -187,18 +176,42 @@ fn strip_frontmatter(raw: &str) -> &str {
     raw
 }
 
+/// Extracts the overall rating from Gemini's response.
+///
+/// The prompt instructs Gemini to start the response with one of `Good`,
+/// `Average`, or `Poor`. We pick the earliest **word-boundary** occurrence of
+/// any of those three terms (case-insensitive). This is more robust than a
+/// substring scan, which would:
+/// - Return `Good` if the response merely *mentioned* the word later on,
+///   even when the actual rating up-front was `Poor`.
+/// - Prefer `Good` over `Poor` regardless of which appears first.
 fn extract_overall_rating(text: &str) -> Option<String> {
+    const CANDIDATES: &[(&str, &str)] =
+        &[("good", "Good"), ("average", "Average"), ("poor", "Poor")];
+
     let lowered = text.to_lowercase();
-    if lowered.contains("good") {
-        return Some("Good".to_string());
+    let bytes = lowered.as_bytes();
+    let mut best: Option<(usize, &str)> = None;
+
+    for (needle, label) in CANDIDATES {
+        let mut start = 0;
+        while let Some(rel) = lowered[start..].find(needle) {
+            let abs = start + rel;
+            let before_ok = abs == 0 || !bytes[abs - 1].is_ascii_alphabetic();
+            let end = abs + needle.len();
+            let after_ok = end >= bytes.len() || !bytes[end].is_ascii_alphabetic();
+            if before_ok && after_ok {
+                match best {
+                    Some((existing, _)) if existing <= abs => {}
+                    _ => best = Some((abs, label)),
+                }
+                break;
+            }
+            start = abs + 1;
+        }
     }
-    if lowered.contains("average") {
-        return Some("Average".to_string());
-    }
-    if lowered.contains("poor") {
-        return Some("Poor".to_string());
-    }
-    None
+
+    best.map(|(_, label)| label.to_string())
 }
 
 #[cfg(test)]
@@ -279,6 +292,24 @@ mod tests {
     fn extract_overall_rating_returns_none_when_missing() {
         let result = extract_overall_rating("Solid play with no rating keyword");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn extract_overall_rating_picks_first_word_when_multiple_present() {
+        let result = extract_overall_rating("Poor laning but a Good late game");
+        assert_eq!(result.as_deref(), Some("Poor"));
+    }
+
+    #[test]
+    fn extract_overall_rating_ignores_substring_in_other_word() {
+        let result = extract_overall_rating("Misunderstood positioning");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn extract_overall_rating_word_boundaries_for_poor() {
+        let result = extract_overall_rating("poorly executed teamfights, Average overall");
+        assert_eq!(result.as_deref(), Some("Average"));
     }
 
     #[test]

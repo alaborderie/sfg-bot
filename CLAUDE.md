@@ -88,6 +88,7 @@ All config via environment variables (see `.env.example`):
 | `GEMINI_API_KEY` | No | Enables AI analysis |
 | `ANALYSIS_PROMPTS_DIR` | No | Directory with role-specific prompts (default: `analysis_prompts`) |
 | `DEFAULT_REGION` | No | Riot API region routing |
+| `HEALTH_CHECK_PORT` | No | If set, bind a `0.0.0.0:port` HTTP/TCP listener that responds `200 OK` (for K8s readiness/liveness probes) |
 
 **Note:** Notification channel is configured at runtime via the `/init-sfg-bot` slash command (stored in `bot_config` DB table).
 Summoners are managed at runtime via `/add-summoner`, `/remove-summoner`, and `/list-summoners` slash commands (stored in `summoners` DB table).

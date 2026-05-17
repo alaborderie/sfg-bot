@@ -1,9 +1,8 @@
-use std::error::Error;
-use std::fmt;
 use std::time::Duration;
 
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tokio::time::sleep;
 
 const DEFAULT_MODEL: &str = "gemini-3.1-flash-lite";
@@ -17,28 +16,19 @@ pub struct GeminiClient {
     model: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum GeminiError {
-    HttpError(reqwest::Error),
+    #[error("HTTP error: {0}")]
+    HttpError(#[from] reqwest::Error),
+    #[error("Gemini API error: {0}")]
     ApiError(String),
+    #[error("Gemini parse error: {0}")]
     ParseError(String),
+    #[error("Gemini API rate limited")]
     RateLimited,
+    #[error("Gemini API request timed out")]
     Timeout,
 }
-
-impl fmt::Display for GeminiError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GeminiError::HttpError(error) => write!(f, "HTTP error: {error}"),
-            GeminiError::ApiError(message) => write!(f, "Gemini API error: {message}"),
-            GeminiError::ParseError(message) => write!(f, "Gemini parse error: {message}"),
-            GeminiError::RateLimited => write!(f, "Gemini API rate limited"),
-            GeminiError::Timeout => write!(f, "Gemini API request timed out"),
-        }
-    }
-}
-
-impl Error for GeminiError {}
 
 #[derive(Debug, Serialize)]
 struct GeminiRequest {
