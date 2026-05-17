@@ -47,16 +47,19 @@ impl Config {
         let gemini_api_key = env::var("GEMINI_API_KEY").ok();
         let analysis_prompts_dir =
             env::var("ANALYSIS_PROMPTS_DIR").unwrap_or_else(|_| "analysis_prompts".to_string());
-        let health_check_port = env::var("HEALTH_CHECK_PORT").ok().and_then(|raw| {
-            raw.parse::<u16>()
-                .inspect_err(|_| {
-                    tracing::warn!(
-                        value = raw.as_str(),
-                        "HEALTH_CHECK_PORT is not a valid u16; health check disabled"
-                    );
-                })
-                .ok()
-        });
+        let health_check_port = env::var("HEALTH_CHECK_PORT")
+            .ok()
+            .filter(|raw| !raw.trim().is_empty())
+            .and_then(|raw| {
+                raw.parse::<u16>()
+                    .inspect_err(|_| {
+                        tracing::warn!(
+                            value = raw.as_str(),
+                            "HEALTH_CHECK_PORT is not a valid u16; health check disabled"
+                        );
+                    })
+                    .ok()
+            });
 
         tracing::info!(
             has_gemini_api_key = gemini_api_key.is_some(),

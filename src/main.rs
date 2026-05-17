@@ -9,10 +9,11 @@ use sfg_bot::{Repository, RiotApiClient};
 use serenity::prelude::*;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::{MissedTickBehavior, interval};
+use tokio::time::{MissedTickBehavior, interval, timeout};
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 const CHAMPION_REFRESH_INTERVAL_SECS: u64 = 24 * 60 * 60;
+const INITIAL_CHAMPION_FETCH_TIMEOUT_SECS: u64 = 30;
 
 #[tokio::main]
 async fn main() {
@@ -49,7 +50,18 @@ async fn main() {
 
     let repository: Arc<dyn Repository> = Arc::new(PgRepository::new(db_pool.clone()));
 
-    refresh_champion_cache(repository.as_ref(), riot_client.as_ref()).await;
+    match timeout(
+        Duration::from_secs(INITIAL_CHAMPION_FETCH_TIMEOUT_SECS),
+        refresh_champion_cache(repository.as_ref(), riot_client.as_ref()),
+    )
+    .await
+    {
+        Ok(()) => {}
+        Err(_) => tracing::warn!(
+            timeout_secs = INITIAL_CHAMPION_FETCH_TIMEOUT_SECS,
+            "Initial champion cache refresh timed out; continuing startup with stale/empty cache"
+        ),
+    }
 
     spawn_champion_refresh_task(repository.clone(), riot_client.clone());
 
