@@ -47,3 +47,5 @@ AI-powered post-game analysis using Google Gemini API.
 - Role-specific files: `top.md`, `jungle.md`, `middle.md`, `bottom.md`, `support.md`
 - Fallback: `default.md` used when role has no specific prompt
 - Prompts written in French, instruct Gemini to produce French output
+- Each prompt file is a Claude agent definition: YAML frontmatter (`name`, `description`, `model`) followed by the prompt body. `pipeline::strip_frontmatter` removes the frontmatter before the body is sent to Gemini, so the metadata never reaches the model.
+- When adding a new role: create `{role}.md` with a frontmatter block, then register `(<RIOT_ROLE>, "<role>.md")` in `ROLE_PROMPT_FILES`.

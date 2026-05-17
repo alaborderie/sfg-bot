@@ -59,12 +59,14 @@ impl AnalysisPipeline {
         }
 
         let default_prompt_path = dir_path.join(DEFAULT_PROMPT_FILE);
-        let default_prompt = fs::read_to_string(&default_prompt_path).map_err(|e| {
-            AnalysisError::PromptDirError(format!(
-                "Failed to read default prompt {}: {e}",
-                default_prompt_path.display()
-            ))
-        })?;
+        let default_prompt = fs::read_to_string(&default_prompt_path)
+            .map(|raw| strip_frontmatter(&raw).to_string())
+            .map_err(|e| {
+                AnalysisError::PromptDirError(format!(
+                    "Failed to read default prompt {}: {e}",
+                    default_prompt_path.display()
+                ))
+            })?;
 
         let mut role_prompts = HashMap::new();
 
@@ -72,7 +74,8 @@ impl AnalysisPipeline {
             let file_path = dir_path.join(filename);
             match fs::read_to_string(&file_path) {
                 Ok(content) => {
-                    role_prompts.insert((*role).to_string(), content);
+                    role_prompts
+                        .insert((*role).to_string(), strip_frontmatter(&content).to_string());
                 }
                 Err(e) => {
                     tracing::warn!(
@@ -152,6 +155,36 @@ impl AnalysisPipeline {
             error: Some(error_message),
         }
     }
+}
+
+/// Strips YAML frontmatter from a prompt file so Claude agent metadata
+/// (`---\nname: ...\n---`) is not sent to Gemini as part of the system prompt.
+fn strip_frontmatter(raw: &str) -> &str {
+    let trimmed = raw.trim_start_matches('\u{feff}');
+    let Some(rest) = trimmed.strip_prefix("---") else {
+        return raw;
+    };
+    let after_open = rest
+        .strip_prefix('\n')
+        .or_else(|| rest.strip_prefix("\r\n"));
+    let Some(after_open) = after_open else {
+        return raw;
+    };
+    let mut search_from = 0;
+    while let Some(idx) = after_open[search_from..].find("---") {
+        let abs = search_from + idx;
+        let starts_at_line_start = abs == 0 || after_open.as_bytes()[abs - 1] == b'\n';
+        if starts_at_line_start {
+            let after_close = &after_open[abs + 3..];
+            let trimmed = after_close
+                .strip_prefix("\r\n")
+                .or_else(|| after_close.strip_prefix('\n'))
+                .unwrap_or(after_close);
+            return trimmed.trim_start();
+        }
+        search_from = abs + 3;
+    }
+    raw
 }
 
 fn extract_overall_rating(text: &str) -> Option<String> {
@@ -246,6 +279,50 @@ mod tests {
     fn extract_overall_rating_returns_none_when_missing() {
         let result = extract_overall_rating("Solid play with no rating keyword");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn strip_frontmatter_removes_yaml_block() {
+        let input = "---\nname: lol-coach-top\ndescription: foo\n---\n\nTu es un coach.";
+        assert_eq!(strip_frontmatter(input), "Tu es un coach.");
+    }
+
+    #[test]
+    fn strip_frontmatter_passthrough_when_absent() {
+        let input = "Tu es un coach.\nLigne 2.";
+        assert_eq!(strip_frontmatter(input), input);
+    }
+
+    #[test]
+    fn strip_frontmatter_passthrough_when_unterminated() {
+        let input = "---\nname: foo\nno closing fence";
+        assert_eq!(strip_frontmatter(input), input);
+    }
+
+    #[test]
+    fn pipeline_strips_frontmatter_from_prompts() {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join("default.md"),
+            "---\nname: lol-coach-default\ndescription: d\n---\n\nDefault prompt: {game_data}",
+        )
+        .unwrap();
+        fs::write(
+            dir.path().join("top.md"),
+            "---\nname: lol-coach-top\n---\n\nTop lane prompt: {game_data}",
+        )
+        .unwrap();
+
+        let client = GeminiClient::new("fake-key".to_string()).unwrap();
+        let pipeline = AnalysisPipeline::new(client, dir.path().to_str().unwrap()).unwrap();
+
+        let top = pipeline.get_prompt_for_role("TOP");
+        assert!(!top.contains("name: lol-coach-top"));
+        assert!(top.starts_with("Top lane prompt:"));
+
+        let fallback = pipeline.get_prompt_for_role("UNKNOWN");
+        assert!(!fallback.contains("name: lol-coach-default"));
+        assert!(fallback.starts_with("Default prompt:"));
     }
 
     #[test]

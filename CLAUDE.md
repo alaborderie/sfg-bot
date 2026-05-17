@@ -91,3 +91,18 @@ All config via environment variables (see `.env.example`):
 
 **Note:** Notification channel is configured at runtime via the `/init-sfg-bot` slash command (stored in `bot_config` DB table).
 Summoners are managed at runtime via `/add-summoner`, `/remove-summoner`, and `/list-summoners` slash commands (stored in `summoners` DB table).
+
+## Analysis Prompts (Claude agent format)
+
+Files in `analysis_prompts/` (`default.md`, `top.md`, `jungle.md`, `middle.md`, `bottom.md`, `support.md`) are Claude-style agent definitions: a YAML frontmatter block (`name`, `description`, `model`) followed by the prompt body. The frontmatter is metadata only — `AnalysisPipeline::new` calls `strip_frontmatter` so only the body is sent to Gemini.
+
+When editing prompts:
+- Keep the frontmatter block intact (opening `---` on line 1, closing `---` on its own line, prompt body after).
+- Update `description` if the prompt's focus shifts.
+- The body is in French and instructs Gemini to respond in French — preserve that.
+- Add new role-specific prompts by creating `{role}.md` and registering the filename in `ROLE_PROMPT_FILES` in `src/analysis/pipeline.rs`.
+
+## Claude Code workflow
+
+- `.claude/settings.json` preallows the common cargo/sqlx/git commands used in this repo and pins `SQLX_OFFLINE=true` so `cargo check` / `clippy` work without a live database.
+- Per-module guidance lives in `src/{discord,riot,db,notification,analysis}/CLAUDE.md`.
