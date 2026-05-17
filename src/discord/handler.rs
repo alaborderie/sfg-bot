@@ -318,6 +318,7 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
                 enemy_cs: None,
                 enemy_gold: None,
                 enemy_damage: None,
+                role_gaps: None,
             };
 
             tracker.repository.insert_notification_event(&event).await?;
@@ -366,6 +367,7 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
                         enemy_cs: match_result.enemy_cs,
                         enemy_gold: match_result.enemy_gold,
                         enemy_damage: match_result.enemy_damage,
+                        role_gaps: match_result.role_gaps.clone(),
                     };
 
                     tracker.repository.insert_notification_event(&event).await?;
@@ -440,6 +442,7 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
                         enemy_cs: match_result.enemy_cs,
                         enemy_gold: match_result.enemy_gold,
                         enemy_damage: match_result.enemy_damage,
+                        role_gaps: match_result.role_gaps.clone(),
                     };
 
                     tracker.repository.insert_notification_event(&event).await?;

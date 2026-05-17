@@ -174,7 +174,22 @@ pub fn format_grouped_game_ended(
         }
     }
 
+    if let Some(gaps) = pick_role_gaps(events) {
+        embed = embed.field("🎯 Écarts par rôle", gaps, false);
+    }
+
     embed
+}
+
+/// Picks the first non-empty `role_gaps` summary across grouped events
+/// (they all come from the same match, so any one is canonical) — surfaces
+/// lane-gap context in the recap regardless of which side won.
+fn pick_role_gaps(events: &[NotificationEvent]) -> Option<String> {
+    events
+        .iter()
+        .find_map(|e| e.role_gaps.as_ref())
+        .filter(|s| !s.is_empty())
+        .cloned()
 }
 
 pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult) -> CreateEmbed {
@@ -224,7 +239,7 @@ pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult)
         match_result.game_mode, queue_type
     );
 
-    CreateEmbed::new()
+    let mut embed = CreateEmbed::new()
         .title(title)
         .description(format!(
             "Partie {} terminée pour {}.",
@@ -237,7 +252,13 @@ pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult)
             true,
         )
         .field("📊 Stats", stats_line, true)
-        .field("⚔️ vs", enemy_line, true)
+        .field("⚔️ vs", enemy_line, true);
+
+    if let Some(gaps) = match_result.role_gaps.as_deref().filter(|s| !s.is_empty()) {
+        embed = embed.field("🎯 Écarts par rôle", gaps.to_string(), false);
+    }
+
+    embed
         .footer(CreateEmbedFooter::new(footer_text))
         .timestamp(Timestamp::now())
 }

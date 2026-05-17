@@ -29,6 +29,8 @@ The trait uses `#[async_trait]` and `#[automock]` (behind `test-mocks` feature).
 
 - `extract_timeline_diff(timeline, participant_id)` — extracts gold/xp/cs diffs from timeline frames
 - `diff_at_frame(frames, participant_id, frame_index)` — computes diff at a specific frame
+- `compute_role_gaps(participants, team_id) -> Vec<RoleGap>` — scans all 10 participants and returns lanes whose gold delta crosses the gap threshold (3000g for solo lanes, 5000g for combined bot lane). Output is from `team_id`'s perspective: positive delta = ally leads.
+- `format_role_gaps(&[RoleGap]) -> Option<String>` — renders as `"Bot gap (-5.5k), Top diff (+4.2k)"`. The result is attached to `MatchResult::role_gaps` and ultimately rendered as a 🎯 Écarts par rôle field on the Discord recap embed.
 
 ### Region Routing
 

@@ -215,6 +215,11 @@ impl RiotApiClient for RiotClient {
 
             let queue_id = Some(m.info.queue_id.0 as i32);
 
+            let role_gaps = format_role_gaps(&compute_role_gaps(
+                &m.info.participants,
+                participant.team_id,
+            ));
+
             Some(MatchResult {
                 match_id: m.metadata.match_id,
                 game_id: m.info.game_id,
@@ -235,6 +240,7 @@ impl RiotApiClient for RiotClient {
                 enemy_gold,
                 enemy_damage,
                 queue_id,
+                role_gaps,
             })
         }))
     }
@@ -398,6 +404,168 @@ impl RiotApiClient for RiotClient {
     }
 }
 
+/// Per-lane gold gap from the tracked summoner's perspective.
+///
+/// `gold_delta = ally_team_gold_in_lane - enemy_team_gold_in_lane`, so a
+/// negative value means the tracked summoner's team is behind in that lane.
+/// For `BOTLANE`, both BOTTOM and UTILITY are summed on each side.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RoleGap {
+    pub lane: &'static str,
+    pub gold_delta: i32,
+}
+
+/// Gold-delta thresholds at which a lane is reported as gapped (or diff'd).
+/// Solo lanes use a tighter threshold than the combined bot lane.
+pub const SOLO_LANE_GAP_THRESHOLD: i32 = 3000;
+pub const BOT_LANE_GAP_THRESHOLD: i32 = 5000;
+
+/// Minimum data needed to compute lane gaps. Decoupled from
+/// `riven::models::match_v5::Participant` so tests don't have to construct
+/// the full Participant struct.
+#[derive(Debug, Clone)]
+pub struct ParticipantGapInput<'a> {
+    pub team_position: &'a str,
+    pub team_id_value: u16,
+    pub gold_earned: i32,
+}
+
+/// Adapter for the production caller that already has riven Participants.
+fn participants_to_gap_inputs(
+    participants: &[riven::models::match_v5::Participant],
+) -> Vec<ParticipantGapInput<'_>> {
+    participants
+        .iter()
+        .map(|p| ParticipantGapInput {
+            team_position: p.team_position.as_str(),
+            team_id_value: <riven::consts::Team as Into<u16>>::into(p.team_id),
+            gold_earned: p.gold_earned,
+        })
+        .collect()
+}
+
+/// Compares per-lane gold totals between teams and returns each lane whose
+/// gold delta crosses the gap threshold. Output is from `team_id`'s
+/// perspective: positive delta = team_id leads the lane.
+///
+/// Riot exposes lanes as `team_position` strings (`TOP`, `JUNGLE`, `MIDDLE`,
+/// `BOTTOM`, `UTILITY`). `Bot` is synthesised by summing BOTTOM + UTILITY
+/// per team.
+pub fn compute_role_gaps(
+    participants: &[riven::models::match_v5::Participant],
+    team_id: riven::consts::Team,
+) -> Vec<RoleGap> {
+    let inputs = participants_to_gap_inputs(participants);
+    compute_role_gaps_from_inputs(&inputs, <riven::consts::Team as Into<u16>>::into(team_id))
+}
+
+pub fn compute_role_gaps_from_inputs(
+    participants: &[ParticipantGapInput<'_>],
+    ally_team_id: u16,
+) -> Vec<RoleGap> {
+    let solo_lanes: &[(&'static str, &str)] =
+        &[("Top", "TOP"), ("Jungle", "JUNGLE"), ("Mid", "MIDDLE")];
+
+    let mut gaps = Vec::new();
+    for (display, riot_pos) in solo_lanes {
+        let ally = lane_gold_input(participants, riot_pos, Some(ally_team_id));
+        let enemy = lane_gold_input_excluding(participants, riot_pos, ally_team_id);
+        if let (Some(ally), Some(enemy)) = (ally, enemy) {
+            let delta = ally - enemy;
+            if delta.abs() >= SOLO_LANE_GAP_THRESHOLD {
+                gaps.push(RoleGap {
+                    lane: display,
+                    gold_delta: delta,
+                });
+            }
+        }
+    }
+
+    let ally_bot = lane_gold_input(participants, "BOTTOM", Some(ally_team_id))
+        .zip(lane_gold_input(participants, "UTILITY", Some(ally_team_id)))
+        .map(|(a, b)| a + b);
+    let enemy_bot = lane_gold_input_excluding(participants, "BOTTOM", ally_team_id)
+        .zip(lane_gold_input_excluding(
+            participants,
+            "UTILITY",
+            ally_team_id,
+        ))
+        .map(|(a, b)| a + b);
+    if let (Some(ally), Some(enemy)) = (ally_bot, enemy_bot) {
+        let delta = ally - enemy;
+        if delta.abs() >= BOT_LANE_GAP_THRESHOLD {
+            gaps.push(RoleGap {
+                lane: "Bot",
+                gold_delta: delta,
+            });
+        }
+    }
+
+    gaps
+}
+
+fn lane_gold_input(
+    participants: &[ParticipantGapInput<'_>],
+    riot_position: &str,
+    team_filter: Option<u16>,
+) -> Option<i32> {
+    let mut total = 0;
+    let mut found = false;
+    for p in participants {
+        if p.team_position != riot_position {
+            continue;
+        }
+        if let Some(team) = team_filter
+            && p.team_id_value != team
+        {
+            continue;
+        }
+        total += p.gold_earned;
+        found = true;
+    }
+    found.then_some(total)
+}
+
+fn lane_gold_input_excluding(
+    participants: &[ParticipantGapInput<'_>],
+    riot_position: &str,
+    excluded_team: u16,
+) -> Option<i32> {
+    let mut total = 0;
+    let mut found = false;
+    for p in participants {
+        if p.team_position != riot_position {
+            continue;
+        }
+        if p.team_id_value == excluded_team {
+            continue;
+        }
+        total += p.gold_earned;
+        found = true;
+    }
+    found.then_some(total)
+}
+
+/// Renders a list of gaps as a single Discord-friendly summary string, or
+/// `None` when the list is empty. Uses the convention "<Lane> gap" when the
+/// tracked summoner's team is behind in that lane and "<Lane> diff" when
+/// ahead. Gold deltas are formatted in thousands with one decimal.
+pub fn format_role_gaps(gaps: &[RoleGap]) -> Option<String> {
+    if gaps.is_empty() {
+        return None;
+    }
+    let parts: Vec<String> = gaps
+        .iter()
+        .map(|g| {
+            let kind = if g.gold_delta < 0 { "gap" } else { "diff" };
+            let magnitude = (g.gold_delta as f32 / 1000.0).abs();
+            let sign = if g.gold_delta < 0 { "-" } else { "+" };
+            format!("{} {} ({}{:.1}k)", g.lane, kind, sign, magnitude)
+        })
+        .collect();
+    Some(parts.join(", "))
+}
+
 fn extract_timeline_diff(
     timeline: Option<&riven::models::match_v5::Timeline>,
     participant: &riven::models::match_v5::Participant,
@@ -466,9 +634,210 @@ fn diff_at_frame(
 
 #[cfg(test)]
 mod tests {
-    use super::diff_at_frame;
+    use super::{
+        ParticipantGapInput, RoleGap, compute_role_gaps_from_inputs, diff_at_frame,
+        format_role_gaps,
+    };
     use riven::models::match_v5::{FramesTimeLine, ParticipantFrame, Position};
     use std::collections::HashMap;
+
+    const BLUE: u16 = 100;
+    const RED: u16 = 200;
+
+    fn p(
+        team_position: &'static str,
+        team_id_value: u16,
+        gold_earned: i32,
+    ) -> ParticipantGapInput<'static> {
+        ParticipantGapInput {
+            team_position,
+            team_id_value,
+            gold_earned,
+        }
+    }
+
+    /// Builds a stock 10-participant 5v5 vector with gold totals supplied
+    /// per (team, position). Other positions get default gold for sanity.
+    fn ten_participants(
+        top: (i32, i32),
+        jungle: (i32, i32),
+        mid: (i32, i32),
+        adc: (i32, i32),
+        sup: (i32, i32),
+    ) -> Vec<ParticipantGapInput<'static>> {
+        vec![
+            p("TOP", BLUE, top.0),
+            p("TOP", RED, top.1),
+            p("JUNGLE", BLUE, jungle.0),
+            p("JUNGLE", RED, jungle.1),
+            p("MIDDLE", BLUE, mid.0),
+            p("MIDDLE", RED, mid.1),
+            p("BOTTOM", BLUE, adc.0),
+            p("BOTTOM", RED, adc.1),
+            p("UTILITY", BLUE, sup.0),
+            p("UTILITY", RED, sup.1),
+        ]
+    }
+
+    #[test]
+    fn no_gaps_when_lanes_are_close() {
+        let participants = ten_participants(
+            (12_000, 12_500),
+            (10_000, 10_400),
+            (13_000, 12_800),
+            (14_000, 13_900),
+            (8_000, 8_100),
+        );
+        let gaps = compute_role_gaps_from_inputs(&participants, BLUE);
+        assert!(gaps.is_empty(), "unexpected gaps: {gaps:?}");
+    }
+
+    #[test]
+    fn solo_lane_gap_above_threshold_is_reported() {
+        let participants = ten_participants(
+            (9_000, 13_500),
+            (10_000, 10_000),
+            (13_000, 13_000),
+            (14_000, 13_900),
+            (8_000, 8_100),
+        );
+        let gaps = compute_role_gaps_from_inputs(&participants, BLUE);
+        assert_eq!(
+            gaps,
+            vec![RoleGap {
+                lane: "Top",
+                gold_delta: -4_500,
+            }]
+        );
+    }
+
+    #[test]
+    fn perspective_flips_for_enemy_team() {
+        let participants = ten_participants(
+            (9_000, 13_500),
+            (10_000, 10_000),
+            (13_000, 13_000),
+            (14_000, 13_900),
+            (8_000, 8_100),
+        );
+        let gaps = compute_role_gaps_from_inputs(&participants, RED);
+        assert_eq!(
+            gaps,
+            vec![RoleGap {
+                lane: "Top",
+                gold_delta: 4_500,
+            }]
+        );
+    }
+
+    #[test]
+    fn bot_lane_combines_adc_and_support() {
+        // ADC delta -2k, Support delta -3.5k → combined -5.5k crosses 5k threshold.
+        // Neither solo-lane delta crosses 3k on its own.
+        let participants = ten_participants(
+            (12_000, 12_500),
+            (10_000, 10_400),
+            (13_000, 12_800),
+            (14_000, 16_000),
+            (6_000, 9_500),
+        );
+        let gaps = compute_role_gaps_from_inputs(&participants, BLUE);
+        assert_eq!(
+            gaps,
+            vec![RoleGap {
+                lane: "Bot",
+                gold_delta: -5_500,
+            }]
+        );
+    }
+
+    #[test]
+    fn multiple_gaps_returned_in_order() {
+        let participants = ten_participants(
+            (15_500, 10_000), // Top diff +5500
+            (10_000, 13_500), // Jungle gap -3500
+            (13_000, 12_800), // no gap
+            (14_000, 16_000), // ADC -2k
+            (6_000, 9_500),   // Sup -3500 → bot combined -5500
+        );
+        let gaps = compute_role_gaps_from_inputs(&participants, BLUE);
+        assert_eq!(
+            gaps,
+            vec![
+                RoleGap {
+                    lane: "Top",
+                    gold_delta: 5_500,
+                },
+                RoleGap {
+                    lane: "Jungle",
+                    gold_delta: -3_500,
+                },
+                RoleGap {
+                    lane: "Bot",
+                    gold_delta: -5_500,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn threshold_is_inclusive_at_3000_for_solo_lanes() {
+        // Exactly 3000 difference qualifies for the "gap" report.
+        let participants = ten_participants(
+            (12_000, 9_000),
+            (10_000, 10_400),
+            (13_000, 12_800),
+            (14_000, 13_900),
+            (8_000, 8_100),
+        );
+        let gaps = compute_role_gaps_from_inputs(&participants, BLUE);
+        assert_eq!(gaps.len(), 1);
+        assert_eq!(gaps[0].lane, "Top");
+        assert_eq!(gaps[0].gold_delta, 3_000);
+    }
+
+    #[test]
+    fn format_role_gaps_uses_gap_for_negative_diff_for_positive() {
+        let summary = format_role_gaps(&[
+            RoleGap {
+                lane: "Bot",
+                gold_delta: -5_500,
+            },
+            RoleGap {
+                lane: "Top",
+                gold_delta: 4_200,
+            },
+        ]);
+        assert_eq!(
+            summary.as_deref(),
+            Some("Bot gap (-5.5k), Top diff (+4.2k)")
+        );
+    }
+
+    #[test]
+    fn format_role_gaps_returns_none_for_empty_list() {
+        assert!(format_role_gaps(&[]).is_none());
+    }
+
+    #[test]
+    fn missing_lane_in_arena_or_aram_yields_no_gap() {
+        // Only 4 participants total (e.g. malformed match data) — should produce no gaps.
+        let participants = vec![
+            p("TOP", BLUE, 10_000),
+            p("TOP", RED, 15_000),
+            p("MIDDLE", BLUE, 12_000),
+            p("MIDDLE", RED, 13_000),
+        ];
+        let gaps = compute_role_gaps_from_inputs(&participants, BLUE);
+        // Top has both sides → 5k delta → gap. Mid is 1k → no gap.
+        assert_eq!(
+            gaps,
+            vec![RoleGap {
+                lane: "Top",
+                gold_delta: -5_000,
+            }]
+        );
+    }
 
     fn build_frame(participant_id: i32, enemy_id: i32) -> FramesTimeLine {
         let mut participant_frames = HashMap::new();

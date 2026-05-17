@@ -26,7 +26,7 @@ Event-driven notification processor — polls DB for pending events, groups mult
 | Function | Purpose |
 |---|---|
 | `format_grouped_game_started()` | Multi-player game start embed (blue) |
-| `format_grouped_game_ended()` | Multi-player game end embed — green (all won), red (all lost), yellow (mixed) |
+| `format_grouped_game_ended()` | Multi-player game end embed — green (all won), red (all lost), yellow (mixed). Appends a 🎯 Écarts par rôle field when any grouped event carries a non-empty `role_gaps` summary (e.g. `"Bot gap (-5.5k)"`) — surfaces lane-imbalance context regardless of who won. |
 | `format_single_game_ended()` | Single player embed, used by `/analyze-last-game` command |
 | `get_queue_type_name()` | Maps Riot queue IDs to French display names |
 | `format_list()` | French-style list formatting (e.g., "A, B et C") |
