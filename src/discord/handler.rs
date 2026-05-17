@@ -584,6 +584,7 @@ mod tests {
             polling_interval_secs: 180,
             gemini_api_key: None,
             analysis_prompts_dir: "analysis_prompts".to_string(),
+            health_check_port: None,
         }
     }
 
