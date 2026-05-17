@@ -88,6 +88,7 @@ All config via environment variables (see `.env.example`):
 | `GEMINI_API_KEY` | No | Enables AI analysis |
 | `ANALYSIS_PROMPTS_DIR` | No | Directory with role-specific prompts (default: `analysis_prompts`) |
 | `DEFAULT_REGION` | No | Riot API region routing |
+| `HEALTH_CHECK_PORT` | No | If set, bind a `0.0.0.0:port` HTTP/TCP listener that responds `200 OK` (for K8s readiness/liveness probes) |
 
 **Note:** Notification channel is configured at runtime via the `/init-sfg-bot` slash command (stored in `bot_config` DB table).
 Summoners are managed at runtime via `/add-summoner`, `/remove-summoner`, and `/list-summoners` slash commands (stored in `summoners` DB table).
@@ -106,3 +107,17 @@ When editing prompts:
 
 - `.claude/settings.json` preallows the common cargo/sqlx/git commands used in this repo and pins `SQLX_OFFLINE=true` so `cargo check` / `clippy` work without a live database.
 - Per-module guidance lives in `src/{discord,riot,db,notification,analysis}/CLAUDE.md`.
+
+## Deployment (K3s)
+
+The runtime config — Deployment manifest, container env, and **secrets** — lives in a sibling repo at `../k3s-ovh-config` (GitHub: `alaborderie/k3s-ovh-config`). Relevant files:
+
+| File | Purpose |
+|---|---|
+| `sfg-bot.yaml` | Kubernetes `Deployment` — image, resources, env vars, probes, container ports |
+| `sfg-bot-secrets.yaml` | `Secret` (`sfg-bot-secrets`) holding `RIOT_API_KEY`, `DISCORD_BOT_TOKEN`, `DISCORD_BOT_ID`, `DATABASE_URL`, `GEMINI_API_KEY`, etc. |
+| `sfg-bot-postgres-init.yaml` | Postgres bootstrap (database + user) |
+
+**Rule (for Claude across sessions):** whenever a change in *this* repo introduces or renames a runtime env var, exposes a new port, changes resource needs, or otherwise alters what the cluster needs to provide, **also update `../k3s-ovh-config`** and open a PR there. Merge the `k3s-ovh-config` PR **first**, then merge the matching sfg-bot PR — otherwise the next deploy will roll out a binary the cluster can't satisfy (missing env, failing probes, etc.).
+
+Secrets values live only in `sfg-bot-secrets.yaml` (Kubernetes `stringData`). Do not copy real secret values into this repo — `.env.example` is for shape only.
