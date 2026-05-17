@@ -20,6 +20,7 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 pub struct Bot {
@@ -27,6 +28,10 @@ pub struct Bot {
     pub riot_client: Arc<dyn RiotApiClient>,
     pub config: Config,
     pub analysis_pipeline: Option<Arc<AnalysisPipeline>>,
+    /// Guards background-task startup so gateway reconnects (which re-fire
+    /// `cache_ready`) don't spawn duplicate polling loops and notification
+    /// processors.
+    background_tasks_started: AtomicBool,
 }
 
 impl Bot {
@@ -46,6 +51,7 @@ impl Bot {
                             riot_client,
                             config,
                             analysis_pipeline: None,
+                            background_tasks_started: AtomicBool::new(false),
                         };
                     }
                 };
@@ -69,7 +75,18 @@ impl Bot {
             riot_client,
             config,
             analysis_pipeline,
+            background_tasks_started: AtomicBool::new(false),
         }
+    }
+
+    /// Returns `true` the first time it is called and `false` on every
+    /// subsequent call. Used to ensure background tasks (per-summoner polling
+    /// loops and the notification processor) are spawned only once, even if
+    /// the serenity gateway re-fires `cache_ready` after a reconnect.
+    fn try_claim_background_tasks(&self) -> bool {
+        self.background_tasks_started
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
     }
 }
 
@@ -94,6 +111,13 @@ impl EventHandler for Bot {
     }
 
     async fn cache_ready(&self, ctx: Context, _guilds: Vec<serenity::model::id::GuildId>) {
+        if !self.try_claim_background_tasks() {
+            tracing::warn!(
+                "cache_ready fired again (likely a gateway reconnect); skipping background task startup to avoid duplicate polling loops"
+            );
+            return;
+        }
+
         tracing::info!("Cache ready, starting background tasks");
 
         let repository = self.repository.clone();
@@ -542,4 +566,80 @@ fn spawn_analysis_task<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Siz
             );
         }
     });
+}
+
+#[cfg(all(test, feature = "test-mocks"))]
+mod tests {
+    use super::*;
+    use crate::db::repository::MockRepository;
+    use crate::riot::client::MockRiotApiClient;
+
+    fn test_config() -> Config {
+        Config {
+            riot_api_key: "test-riot".to_string(),
+            discord_bot_token: "test-token".to_string(),
+            discord_bot_id: 0,
+            database_url: "postgres://localhost/test".to_string(),
+            default_region: "euw1".to_string(),
+            polling_interval_secs: 180,
+            gemini_api_key: None,
+            analysis_prompts_dir: "analysis_prompts".to_string(),
+        }
+    }
+
+    fn build_bot() -> Bot {
+        let repository: Arc<dyn Repository> = Arc::new(MockRepository::new());
+        let riot_client: Arc<dyn RiotApiClient> = Arc::new(MockRiotApiClient::new());
+        Bot::new(repository, riot_client, test_config())
+    }
+
+    #[test]
+    fn try_claim_background_tasks_succeeds_on_first_call() {
+        let bot = build_bot();
+        assert!(
+            bot.try_claim_background_tasks(),
+            "first claim should succeed"
+        );
+    }
+
+    #[test]
+    fn try_claim_background_tasks_blocks_subsequent_calls() {
+        let bot = build_bot();
+
+        assert!(bot.try_claim_background_tasks(), "first claim should win");
+
+        // Simulates gateway reconnects firing cache_ready again.
+        for attempt in 0..5 {
+            assert!(
+                !bot.try_claim_background_tasks(),
+                "claim attempt #{} after the first must be rejected",
+                attempt + 2
+            );
+        }
+    }
+
+    #[test]
+    fn try_claim_background_tasks_is_thread_safe() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let bot = Arc::new(build_bot());
+        let mut handles = Vec::new();
+
+        for _ in 0..16 {
+            let bot = bot.clone();
+            handles.push(thread::spawn(move || bot.try_claim_background_tasks()));
+        }
+
+        let successes = handles
+            .into_iter()
+            .map(|h| h.join().expect("thread panicked"))
+            .filter(|claimed| *claimed)
+            .count();
+
+        assert_eq!(
+            successes, 1,
+            "exactly one thread should claim the background-task slot"
+        );
+    }
 }
