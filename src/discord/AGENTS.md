@@ -6,26 +6,32 @@ Discord bot integration — event handling, slash commands, and message formatti
 
 | File | Purpose |
 |---|---|
-| `handler.rs` | `Bot` struct implementing serenity `EventHandler`. `ready()` registers commands + spawns polling. `check_and_notify()` polls one summoner, inserts notification events. `spawn_analysis_task()` triggers post-game AI analysis |
-| `commands.rs` | `/analyze-last-game` slash command — registration via `CreateCommand` + `run()` handler |
-| `messages.rs` | Message formatting functions: `game_started()`, `game_ended()`, `mention_response()`. All output in French |
+| `handler.rs` | `Bot` struct implementing serenity `EventHandler`. `ready()` registers commands + spawns polling + starts notification processor. `check_and_notify()` polls one summoner, inserts notification events. `spawn_analysis_task()` triggers post-game AI analysis |
+| `commands.rs` | 5 slash commands — registration via `register_all()` → `Vec<CreateCommand>`, per-command handler functions |
+| `messages.rs` | Message formatting functions for game start/end embeds. All output in French |
 
 ## Key Details
 
 ### Bot / Handler (handler.rs)
 
 - `Bot` holds: `Arc<dyn Repository>`, `Arc<dyn RiotApiClient>`, channel ID, analysis pipeline, config
-- On `ready`: registers slash commands globally, then spawns per-summoner polling loops via `tokio::spawn`
+- On `ready`: registers slash commands globally, spawns per-summoner polling loops via `start_polling_task()`, starts `NotificationProcessor`
 - Each polling loop creates its own `GameTracker` and calls `check_and_notify()` in a loop with configurable interval
 - `check_and_notify()` — calls `tracker.check_game()`, matches on `GameStateChange`, inserts `NewNotificationEvent` rows to DB
-- `spawn_analysis_task()` — spawned as detached `tokio::spawn`, fetches match data + timeline, runs analysis pipeline, sends embed to channel
+- `spawn_analysis_task()` — detached `tokio::spawn`, fetches match data + timeline, runs analysis pipeline, sends embed to channel
 - Notification delivery handled by `NotificationProcessor` (separate module), NOT by handler directly
 
 ### Slash Commands (commands.rs)
 
-- Single command: `/analyze-last-game`
-- Uses deferred response pattern (acknowledges immediately, edits later)
-- Fetches last match for a summoner, runs analysis pipeline, responds with embed
+5 commands registered via `register_all()`:
+
+| Command | Handler | Purpose |
+|---|---|---|
+| `/analyze-last-game` | `run()` | Defers response, resolves account, fetches last match, sends recap embed, optionally runs analysis pipeline |
+| `/init-sfg-bot` | `run_init_sfg_bot()` | Sets the notification channel for the current guild |
+| `/list-summoners` | `run_list_summoners()` | Lists all tracked summoners |
+| `/add-summoner` | `run_add_summoner()` | Parses `Name#Tag`, calls `riot_client.get_account_by_riot_id()`, upserts to DB |
+| `/remove-summoner` | `run_remove_summoner()` | Parses `Name#Tag`, calls `repository.delete_summoner_by_name_and_tag()` |
 
 ### Messages (messages.rs)
 

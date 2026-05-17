@@ -50,7 +50,7 @@ Discord bot that tracks SouthFoxGaming League of Legends games — detects game 
 - `cargo fmt` — enforced in CI
 - `cargo clippy -- -D warnings` — all warnings are errors
 - `#[async_trait]` on all async trait definitions
-- Error types use `thiserror` derive macros exclusively
+- Error types use `thiserror` derive macros (except `analysis/` which uses manual `impl Error`)
 - Raw SQL with `sqlx::query_as!` / `sqlx::query!` — no ORM, no query builder
 - All user-facing text is in **French**
 
@@ -63,7 +63,7 @@ Discord bot that tracks SouthFoxGaming League of Legends games — detects game 
 
 ### Database
 
-- **Migrations** — `migrations/` directory (8 migrations), run automatically on startup via `sqlx::migrate!()`
+- **Migrations** — `migrations/` directory (9 migrations), run automatically on startup via `sqlx::migrate!()`
 - **Offline mode** — `SQLX_OFFLINE=true` in CI; update with `cargo sqlx prepare`
 - **Schema** — summoners, active_games, match_history, champions, notification_events, bot_config tables
 - **Pool** — max 5 connections (PgPoolOptions)
