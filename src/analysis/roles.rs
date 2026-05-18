@@ -173,7 +173,7 @@ pub const BOTTOM: RoleSpec = RoleSpec {
             skill: "damage_per_minute",
             importance: SkillImportance::Critical,
             benchmarks: "Repères ADC en Platine/Émeraude :\n- Poor : < 600 DPM\n- Average : 600-800 DPM\n- Good : 800-1100 DPM\n- Excellent : 1100+ DPM\n\nL'ADC devrait être 1er en team_damage_percentage (25-35% des dégâts d'équipe).",
-            role_notes: "Le DPM ADC est la métrique de succès numéro 2 après la survie. Un ADC qui infligé peu de dégâts = ADC qui est mort tôt en teamfight ou qui est resté trop à l'arrière.",
+            role_notes: "Le DPM ADC est la métrique de succès numéro 2 après la survie. Un ADC qui inflige peu de dégâts = ADC qui est mort tôt en teamfight ou qui est resté trop à l'arrière.",
         },
         SkillBinding {
             skill: "kills_assists",

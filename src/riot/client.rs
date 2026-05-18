@@ -820,8 +820,9 @@ mod tests {
     }
 
     #[test]
-    fn missing_lane_in_arena_or_aram_yields_no_gap() {
-        // Only 4 participants total (e.g. malformed match data) — should produce no gaps.
+    fn partial_participant_list_only_reports_gaps_for_lanes_present() {
+        // Only Top + Middle are populated (e.g. malformed match data missing other roles).
+        // Top has both sides → 5k delta → gap. Mid is 1k → no gap. Jungle/Bot/Sup are absent → ignored.
         let participants = vec![
             p("TOP", BLUE, 10_000),
             p("TOP", RED, 15_000),
@@ -829,7 +830,6 @@ mod tests {
             p("MIDDLE", RED, 13_000),
         ];
         let gaps = compute_role_gaps_from_inputs(&participants, BLUE);
-        // Top has both sides → 5k delta → gap. Mid is 1k → no gap.
         assert_eq!(
             gaps,
             vec![RoleGap {
