@@ -40,6 +40,7 @@ fn create_dummy_event(win: bool) -> NotificationEvent {
         enemy_cs: Some(180),
         enemy_gold: Some(11000),
         enemy_damage: Some(24000),
+        role_gaps: None,
         processed: false,
         created_at: Utc::now(),
         processed_at: None,
@@ -71,4 +72,32 @@ fn test_game_lost_title() {
 
     let debug_str = format!("{:?}", embed);
     assert!(debug_str.contains("Partie perdue !"));
+}
+
+#[test]
+fn role_gaps_field_appears_when_event_has_gaps() {
+    let summoner = create_dummy_summoner();
+    let mut event = create_dummy_event(true);
+    event.summoner_id = summoner.id;
+    event.role_gaps = Some("Bot gap (-5.5k), Top diff (+4.2k)".to_string());
+
+    let embed = format_grouped_game_ended(&[summoner], &[event], "Ranked Solo/Duo");
+
+    let debug_str = format!("{:?}", embed);
+    assert!(debug_str.contains("Écarts par rôle"));
+    assert!(debug_str.contains("Bot gap (-5.5k)"));
+    assert!(debug_str.contains("Top diff (+4.2k)"));
+}
+
+#[test]
+fn role_gaps_field_absent_when_no_gaps() {
+    let summoner = create_dummy_summoner();
+    let mut event = create_dummy_event(true);
+    event.summoner_id = summoner.id;
+    event.role_gaps = None;
+
+    let embed = format_grouped_game_ended(&[summoner], &[event], "Ranked Solo/Duo");
+
+    let debug_str = format!("{:?}", embed);
+    assert!(!debug_str.contains("Écarts par rôle"));
 }

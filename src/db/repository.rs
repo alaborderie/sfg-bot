@@ -332,9 +332,9 @@ impl Repository for PgRepository {
     ) -> Result<NotificationEvent, RepositoryError> {
         let notification = sqlx::query_as::<_, NotificationEvent>(
               r#"
-              INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, queue_id, is_featured_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
-              RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, queue_id, is_featured_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, processed, created_at, processed_at, retry_count, error_message
+              INSERT INTO notification_queue (summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, queue_id, is_featured_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, role_gaps)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+              RETURNING id, summoner_id, event_type, game_id, match_id, champion_id, champion_name, role, win, kills, deaths, assists, game_duration_secs, game_mode, queue_id, is_featured_mode, total_cs, total_gold, total_damage, enemy_champion_name, enemy_cs, enemy_gold, enemy_damage, role_gaps, processed, created_at, processed_at, retry_count, error_message
               "#,
           )
           .bind(event.summoner_id)
@@ -359,6 +359,7 @@ impl Repository for PgRepository {
           .bind(event.enemy_cs)
           .bind(event.enemy_gold)
           .bind(event.enemy_damage)
+          .bind(&event.role_gaps)
          .fetch_one(&self.pool)
          .await?;
         Ok(notification)

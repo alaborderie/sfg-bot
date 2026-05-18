@@ -40,6 +40,10 @@ pub struct MatchResult {
     pub enemy_gold: Option<i32>,
     pub enemy_damage: Option<i32>,
     pub queue_id: Option<i32>,
+    /// Pre-formatted per-lane gold-gap summary from the tracked summoner's
+    /// perspective (e.g. `"Bot gap (-5.8k), Top diff (+4.1k)"`). `None` when
+    /// no lane crosses the gap threshold.
+    pub role_gaps: Option<String>,
 }
 
 /// Represents a change in game state for a summoner

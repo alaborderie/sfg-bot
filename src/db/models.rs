@@ -118,6 +118,7 @@ pub struct NotificationEvent {
     pub enemy_cs: Option<i32>,
     pub enemy_gold: Option<i32>,
     pub enemy_damage: Option<i32>,
+    pub role_gaps: Option<String>,
     pub processed: bool,
     pub created_at: DateTime<Utc>,
     pub processed_at: Option<DateTime<Utc>>,
@@ -149,6 +150,7 @@ pub struct NewNotificationEvent {
     pub enemy_cs: Option<i32>,
     pub enemy_gold: Option<i32>,
     pub enemy_damage: Option<i32>,
+    pub role_gaps: Option<String>,
 }
 
 #[derive(Debug, Clone, FromRow)]

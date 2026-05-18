@@ -67,6 +67,7 @@ fn create_test_match_result(game_id: i64) -> MatchResult {
         enemy_gold: Some(12000),
         enemy_damage: Some(18000),
         queue_id: None,
+        role_gaps: None,
     }
 }
 

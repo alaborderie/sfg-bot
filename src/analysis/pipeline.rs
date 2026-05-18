@@ -6,6 +6,7 @@ use thiserror::Error;
 
 use crate::analysis::gemini::{GeminiClient, GeminiError};
 use crate::analysis::models::{AnalysisData, AnalysisResult};
+use crate::analysis::roles::{ROLE_SPECS, RoleSpec, SkillImportance, spec_for};
 
 /// Maps Riot API team_position values to prompt file names.
 const ROLE_PROMPT_FILES: &[(&str, &str)] = &[
@@ -17,6 +18,14 @@ const ROLE_PROMPT_FILES: &[(&str, &str)] = &[
 ];
 
 const DEFAULT_PROMPT_FILE: &str = "default.md";
+const SKILLS_SUBDIR: &str = "skills";
+const SKILL_NAMES: &[&str] = &[
+    "cs_per_minute",
+    "damage_per_minute",
+    "kills_assists",
+    "deaths",
+    "vision_score",
+];
 
 #[derive(Debug, Error)]
 pub enum AnalysisError {
@@ -33,7 +42,9 @@ pub enum AnalysisError {
 #[derive(Clone)]
 pub struct AnalysisPipeline {
     gemini_client: GeminiClient,
+    /// Final composed prompts (role intro + skill blocks) keyed by Riot role.
     role_prompts: HashMap<String, String>,
+    /// Fallback used when no role-specific composed prompt exists.
     default_prompt: String,
 }
 
@@ -57,15 +68,13 @@ impl AnalysisPipeline {
                 ))
             })?;
 
-        let mut role_prompts = HashMap::new();
+        let skills = load_skills(dir_path);
 
+        let mut role_prompts = HashMap::new();
         for (role, filename) in ROLE_PROMPT_FILES {
             let file_path = dir_path.join(filename);
-            match fs::read_to_string(&file_path) {
-                Ok(content) => {
-                    role_prompts
-                        .insert((*role).to_string(), strip_frontmatter(&content).to_string());
-                }
+            let intro = match fs::read_to_string(&file_path) {
+                Ok(content) => strip_frontmatter(&content).to_string(),
                 Err(e) => {
                     tracing::warn!(
                         role = *role,
@@ -73,13 +82,22 @@ impl AnalysisPipeline {
                         error = %e,
                         "Role-specific prompt not found, will use default"
                     );
+                    continue;
                 }
-            }
+            };
+
+            let composed = match spec_for(role) {
+                Some(spec) => compose_prompt(&intro, spec, &skills),
+                None => intro,
+            };
+            role_prompts.insert((*role).to_string(), composed);
         }
 
         tracing::info!(
             loaded_roles = role_prompts.len(),
             total_roles = ROLE_PROMPT_FILES.len(),
+            loaded_skills = skills.len(),
+            specs = ROLE_SPECS.len(),
             "Analysis prompts loaded"
         );
 
@@ -144,6 +162,68 @@ impl AnalysisPipeline {
             error: Some(error_message),
         }
     }
+}
+
+/// Loads every shared skill template into a `name -> body` map. Missing
+/// files are skipped with a warning rather than failing startup — a role
+/// that references a missing skill simply won't get that block.
+fn load_skills(prompts_dir: &Path) -> HashMap<&'static str, String> {
+    let skills_dir = prompts_dir.join(SKILLS_SUBDIR);
+    let mut out = HashMap::new();
+    if !skills_dir.is_dir() {
+        tracing::warn!(
+            dir = %skills_dir.display(),
+            "Skills directory not found; role prompts will fall back to intro-only"
+        );
+        return out;
+    }
+    for name in SKILL_NAMES {
+        let path = skills_dir.join(format!("{name}.md"));
+        match fs::read_to_string(&path) {
+            Ok(raw) => {
+                out.insert(*name, strip_frontmatter(&raw).to_string());
+            }
+            Err(e) => {
+                tracing::warn!(
+                    skill = *name,
+                    file = %path.display(),
+                    error = %e,
+                    "Skill file not found, role bindings referencing it will be skipped"
+                );
+            }
+        }
+    }
+    out
+}
+
+/// Composes the final per-role prompt: role intro + each applicable skill
+/// block with role-specific thresholds substituted in.
+fn compose_prompt(intro: &str, spec: &RoleSpec, skills: &HashMap<&'static str, String>) -> String {
+    let mut sections: Vec<String> = vec![intro.trim_end().to_string()];
+
+    sections.push(String::from(
+        "\n---\n\n## Référentiel par compétence (Platine / Émeraude)\n",
+    ));
+
+    for binding in spec.bindings {
+        if binding.importance == SkillImportance::NotApplicable {
+            continue;
+        }
+        let Some(template) = skills.get(binding.skill) else {
+            continue;
+        };
+        let body = template
+            .replace("{benchmarks}", binding.benchmarks)
+            .replace("{role_notes}", binding.role_notes);
+
+        if let Some(label) = binding.importance.label_fr() {
+            sections.push(format!("{label}\n\n{body}"));
+        } else {
+            sections.push(body);
+        }
+    }
+
+    sections.join("\n\n")
 }
 
 /// Strips YAML frontmatter from a prompt file so Claude agent metadata
@@ -261,13 +341,30 @@ mod tests {
         }
     }
 
-    fn create_prompts_dir(dir: &TempDir) {
+    fn write_role_files(dir: &TempDir) {
         fs::write(dir.path().join("default.md"), "Default prompt: {game_data}").unwrap();
         fs::write(dir.path().join("top.md"), "Top lane prompt: {game_data}").unwrap();
         fs::write(dir.path().join("jungle.md"), "Jungle prompt: {game_data}").unwrap();
         fs::write(dir.path().join("middle.md"), "Mid lane prompt: {game_data}").unwrap();
         fs::write(dir.path().join("bottom.md"), "ADC prompt: {game_data}").unwrap();
         fs::write(dir.path().join("support.md"), "Support prompt: {game_data}").unwrap();
+    }
+
+    fn write_skill_files(dir: &TempDir) {
+        let skills = dir.path().join("skills");
+        fs::create_dir_all(&skills).unwrap();
+        for name in SKILL_NAMES {
+            fs::write(
+                skills.join(format!("{name}.md")),
+                format!("### {name} skill\n\n{{benchmarks}}\n\n{{role_notes}}\n"),
+            )
+            .unwrap();
+        }
+    }
+
+    fn make_pipeline(dir: &TempDir) -> AnalysisPipeline {
+        let client = GeminiClient::new("fake-key".to_string()).unwrap();
+        AnalysisPipeline::new(client, dir.path().to_str().unwrap()).unwrap()
     }
 
     #[test]
@@ -344,8 +441,7 @@ mod tests {
         )
         .unwrap();
 
-        let client = GeminiClient::new("fake-key".to_string()).unwrap();
-        let pipeline = AnalysisPipeline::new(client, dir.path().to_str().unwrap()).unwrap();
+        let pipeline = make_pipeline(&dir);
 
         let top = pipeline.get_prompt_for_role("TOP");
         assert!(!top.contains("name: lol-coach-top"));
@@ -368,10 +464,8 @@ mod tests {
     #[test]
     fn get_prompt_for_role_returns_role_specific_prompt() {
         let dir = TempDir::new().unwrap();
-        create_prompts_dir(&dir);
-
-        let client = GeminiClient::new("fake-key".to_string()).unwrap();
-        let pipeline = AnalysisPipeline::new(client, dir.path().to_str().unwrap()).unwrap();
+        write_role_files(&dir);
+        let pipeline = make_pipeline(&dir);
 
         assert!(pipeline.get_prompt_for_role("TOP").contains("Top lane"));
         assert!(pipeline.get_prompt_for_role("JUNGLE").contains("Jungle"));
@@ -383,10 +477,8 @@ mod tests {
     #[test]
     fn get_prompt_for_role_falls_back_to_default() {
         let dir = TempDir::new().unwrap();
-        create_prompts_dir(&dir);
-
-        let client = GeminiClient::new("fake-key".to_string()).unwrap();
-        let pipeline = AnalysisPipeline::new(client, dir.path().to_str().unwrap()).unwrap();
+        write_role_files(&dir);
+        let pipeline = make_pipeline(&dir);
 
         assert!(pipeline.get_prompt_for_role("").contains("Default"));
         assert!(pipeline.get_prompt_for_role("UNKNOWN").contains("Default"));
@@ -413,11 +505,71 @@ mod tests {
     fn new_succeeds_with_only_default_prompt() {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("default.md"), "Default only: {game_data}").unwrap();
-
-        let client = GeminiClient::new("fake-key".to_string()).unwrap();
-        let pipeline = AnalysisPipeline::new(client, dir.path().to_str().unwrap()).unwrap();
+        let pipeline = make_pipeline(&dir);
 
         assert!(pipeline.get_prompt_for_role("TOP").contains("Default"));
         assert!(pipeline.get_prompt_for_role("MIDDLE").contains("Default"));
+    }
+
+    #[test]
+    fn composed_role_prompt_includes_applicable_skills() {
+        let dir = TempDir::new().unwrap();
+        write_role_files(&dir);
+        write_skill_files(&dir);
+        let pipeline = make_pipeline(&dir);
+
+        let top = pipeline.get_prompt_for_role("TOP");
+        assert!(top.contains("Top lane prompt"));
+        assert!(top.contains("Référentiel par compétence"));
+        assert!(top.contains("cs_per_minute skill"));
+        assert!(top.contains("damage_per_minute skill"));
+        assert!(top.contains("kills_assists skill"));
+        assert!(top.contains("deaths skill"));
+        assert!(top.contains("vision_score skill"));
+        // Top spec marks CS as Critical, so the critical label should appear.
+        assert!(top.contains("Métrique critique"));
+    }
+
+    #[test]
+    fn composed_support_prompt_skips_cs_per_minute() {
+        let dir = TempDir::new().unwrap();
+        write_role_files(&dir);
+        write_skill_files(&dir);
+        let pipeline = make_pipeline(&dir);
+
+        let support = pipeline.get_prompt_for_role("UTILITY");
+        assert!(support.contains("Support prompt"));
+        // Support config marks CS as NotApplicable → its block must NOT appear.
+        assert!(!support.contains("cs_per_minute skill"));
+        // ...but vision and KP are critical and must appear.
+        assert!(support.contains("vision_score skill"));
+        assert!(support.contains("kills_assists skill"));
+    }
+
+    #[test]
+    fn composed_prompt_substitutes_benchmarks_and_notes() {
+        let dir = TempDir::new().unwrap();
+        write_role_files(&dir);
+        write_skill_files(&dir);
+        let pipeline = make_pipeline(&dir);
+
+        let adc = pipeline.get_prompt_for_role("BOTTOM");
+        // BOTTOM spec has concrete CS benchmarks like "8-9 CS/min".
+        assert!(adc.contains("8-9 CS/min"));
+        // It also has concrete DPM benchmarks like "800-1100 DPM".
+        assert!(adc.contains("800-1100 DPM"));
+    }
+
+    #[test]
+    fn pipeline_works_without_skills_directory() {
+        let dir = TempDir::new().unwrap();
+        write_role_files(&dir);
+        // No skills dir written.
+        let pipeline = make_pipeline(&dir);
+
+        let top = pipeline.get_prompt_for_role("TOP");
+        // Still composes the header but no skill bodies.
+        assert!(top.contains("Top lane prompt"));
+        assert!(!top.contains("cs_per_minute skill"));
     }
 }

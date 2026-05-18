@@ -35,19 +35,34 @@ jobs:
   audit:
     name: Audit
     runs-on: ubuntu-latest
-    # Advisory-only — we surface RustSec findings in the run summary but
-    # don't block PR merges on transitive-dep advisories we can't fix
-    # without an upstream release (rsa Marvin Attack, rustls-webpki pinned
-    # by serenity 0.12, etc.). Re-evaluate when serenity 0.13 ships.
-    continue-on-error: true
-    permissions:
-      checks: write
-      contents: read
+    # Advisory-only — surfaces RustSec findings in the job summary but never
+    # blocks PR merges. The transitive advisories we currently carry (rsa
+    # Marvin Attack, rustls-webpki pinned by serenity 0.12, etc.) can only
+    # be cleared by upstream releases. Re-evaluate when serenity 0.13 ships.
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Run cargo audit (advisory only)
+        run: |
+          set +e
+          cargo audit 2>&1 | tee audit_output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## cargo audit report"
+            echo ""
+            echo '```'
+            cat audit_output.txt
+            echo '```'
+            echo ""
+            if [ "$status" -eq 0 ]; then
+              echo "_No advisories found._"
+            else
+              echo "_Advisories above are informational only — see job description for context._"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
 
   build:
     name: Build
