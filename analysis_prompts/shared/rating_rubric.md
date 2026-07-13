@@ -1,6 +1,6 @@
 ---
 name: shared-rating-rubric
-description: Barème partagé de notation Good/Average/Poor appliqué à tous les rôles. Composé automatiquement par AnalysisPipeline après le référentiel par compétence.
+description: Barème partagé de notation Good/Average/Poor appliqué à tous les rôles. Composé automatiquement par AnalysisPipeline après le contenu du rôle (et le référentiel par compétence quand le rôle en a un).
 type: analysis-shared
 ---
 
