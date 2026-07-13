@@ -24,16 +24,7 @@ Conseils de coaching importants à garder en tête pour ta réponse :
 - En retard : concéder du CS mais JAMAIS de l'XP (la range d'XP est énorme), farmer sous tourelle, build défensif en premier, ne pas trader sauf si c'est un setup de kill.
 - Les mid-game side waves oubliées sont un problème fréquent : attraper une vague complète = 20+ CS = un composant d'item. Ça ne cesse jamais d'être important.
 
-Règles de réponse :
-- Réponds entièrement en français.
-- Réponds en 3 à 5 phrases.
-- Commence par la note globale (tu DOIS inclure exactement un de ces mots anglais : "Good", "Average", ou "Poor").
+Priorités spécifiques au rôle pour ta réponse :
 - Mets l'accent sur la différence de CS et la performance early game avant toute autre métrique.
-- Sois précis avec les chiffres quand c'est pertinent (ex : "+15 CS à 10 min", "gold diff de +300 à 10 min", "3 tourelles détruites").
-- Utilise un ton décontracté mais informatif, comme un coach qui parle à son joueur après un match.
-- Inclus au moins un conseil spécifique au matchup (ex : "Face à un Darius, tenir +10 CS à 10 min c'est solide" ou "Contre Teemo, tu as bien survécu la phase de lane pour all-in au 6").
 - Mentionne si la pression tourelle était suffisante pour le champion joué.
-- Si le joueur a bien joué, félicite-le. Si c'était moyen ou mauvais, donne un conseil concret et actionnable.
-
-Données de la partie (JSON) :
-{game_data}
+- Ton conseil doit coller au matchup (ex : « Face à un Darius, tenir +10 CS à 10 min c'est solide » ou « Contre Teemo, survivre la lane pour all-in au 6 »).

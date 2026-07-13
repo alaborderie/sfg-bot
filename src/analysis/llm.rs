@@ -90,7 +90,9 @@ impl LlmClient {
                 role: LlmRole::User,
                 content: prompt_text,
             }],
-            temperature: Some(0.7),
+            // Low temperature: ratings must be stable across reruns of
+            // similar games; this is evaluation, not creative writing.
+            temperature: Some(0.35),
             max_tokens: Some(MAX_TOKENS),
         };
 

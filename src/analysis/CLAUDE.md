@@ -32,6 +32,7 @@ AI-powered post-game analysis using a self-hosted LLM (Gemma 4) behind an OpenAI
 - Retry logic: exponential backoff on 429 (rate limit) and 5xx errors
 - API key passed as `Authorization: Bearer` header
 - Gemma 4 is a reasoning model: it spends tokens on `reasoning_content` before the visible answer, so `MAX_TOKENS` is 4096 and the HTTP timeout is 300s (local generation runs ~30 tokens/s); an empty `content` field is treated as `ParseError`
+- Temperature is 0.35: ratings must be stable across reruns of similar games
 
 ### Error Handling
 
@@ -49,9 +50,18 @@ AI-powered post-game analysis using a self-hosted LLM (Gemma 4) behind an OpenAI
 - Directory configured via `ANALYSIS_PROMPTS_DIR` env var (default: `analysis_prompts/`)
 - Role-specific files at the root: `top.md`, `jungle.md`, `middle.md`, `bottom.md`, `support.md` — these are the **role intro** (identity, tactics, matchup advice).
 - Fallback: `default.md` used when role has no specific prompt.
+- Role files carry ONLY the role intro, analysis axes, coaching tips, and role-specific response priorities. Generic response rules live in `analysis_prompts/shared/` (see below) — do not re-add per-file "Règles de réponse" blocks.
 - Each prompt file is a Claude agent definition: YAML frontmatter (`name`, `description`, `model`) followed by the prompt body. `pipeline::strip_frontmatter` removes the frontmatter before the body is sent to the LLM, so the metadata never reaches the model.
 - Prompts written in French, instruct the LLM to produce French output.
 - When adding a new role: create `{role}.md` with a frontmatter block, register `(<RIOT_ROLE>, "<role>.md")` in `ROLE_PROMPT_FILES` in `pipeline.rs`, and add a matching `RoleSpec` const in `roles.rs`.
+
+### Shared sections (`analysis_prompts/shared/`)
+
+- `rating_rubric.md` — the Good/Average/Poor calibration rubric (win/loss weighting, "lost lane converted into a win is at least Average", etc.). Appended to every composed prompt after the skills referential.
+- `response_format.md` — output contract: French, rating as the literal first word (parser contract with `extract_overall_rating`), 150-250 words in 3 paragraphs ending with « Conseil de coach : » + one numeric goal.
+- Loaded by `load_shared_sections`; missing files are skipped with a warning (same robustness contract as skills).
+- The pipeline appends a final `## Données de la partie (JSON)` section carrying the `{game_data}` placeholder — prompt files must NOT contain `{game_data}` themselves.
+- Live calibration harness: `cargo test --test live_llm_calibration -- --ignored --test-threads=1` runs real scenarios against the local LLM server and asserts rating calibration (stomp-win is never Poor, disaster-loss is never Good, etc.).
 
 ### Shared skills (`analysis_prompts/skills/`)
 
