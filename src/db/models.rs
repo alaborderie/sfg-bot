@@ -161,3 +161,28 @@ pub struct BotConfig {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, FromRow)]
+pub struct AnalysisHistoryEntry {
+    pub id: Uuid,
+    pub riot_puuid: String,
+    pub match_id: String,
+    pub role: String,
+    pub champion_name: String,
+    pub win: bool,
+    pub overall_rating: Option<String>,
+    /// JSON-serialized `AnalysisData` snapshot (history stripped).
+    pub analysis_data: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewAnalysisHistory {
+    pub riot_puuid: String,
+    pub match_id: String,
+    pub role: String,
+    pub champion_name: String,
+    pub win: bool,
+    pub overall_rating: Option<String>,
+    pub analysis_data: String,
+}

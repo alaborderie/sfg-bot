@@ -158,6 +158,7 @@ impl EventHandler for Bot {
                         &ctx,
                         &command,
                         &self.riot_client,
+                        &self.repository,
                         &self.analysis_pipeline,
                         &self.config.default_region,
                     )
@@ -532,7 +533,16 @@ fn spawn_analysis_task<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Siz
             .await;
 
         let result = match analysis_data {
-            Ok(Some(data)) => analysis_pipeline.analyze_game(&data).await,
+            Ok(Some(data)) => {
+                crate::analysis::history::analyze_with_memory(
+                    repository.as_ref(),
+                    &analysis_pipeline,
+                    data,
+                    &summoner_clone.riot_puuid,
+                    &match_id,
+                )
+                .await
+            }
             Ok(None) => AnalysisResult {
                 summoner_name: summoner_name.clone(),
                 champion_name: "Unknown".to_string(),

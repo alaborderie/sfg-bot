@@ -1,6 +1,6 @@
 use crate::db::models::{
-    ActiveGame, BotConfig, Champion, MatchHistory, NewActiveGame, NewMatchResult,
-    NewNotificationEvent, NotificationEvent, Summoner,
+    ActiveGame, AnalysisHistoryEntry, BotConfig, Champion, MatchHistory, NewActiveGame,
+    NewAnalysisHistory, NewMatchResult, NewNotificationEvent, NotificationEvent, Summoner,
 };
 use async_trait::async_trait;
 use sqlx::PgPool;
@@ -105,6 +105,17 @@ pub trait Repository: Send + Sync {
     async fn get_bot_config(&self, guild_id: i64) -> Result<Option<BotConfig>, RepositoryError>;
 
     async fn get_all_bot_configs(&self) -> Result<Vec<BotConfig>, RepositoryError>;
+
+    async fn insert_analysis_history(
+        &self,
+        entry: &NewAnalysisHistory,
+    ) -> Result<(), RepositoryError>;
+
+    async fn get_recent_analysis_history(
+        &self,
+        riot_puuid: &str,
+        limit: i64,
+    ) -> Result<Vec<AnalysisHistoryEntry>, RepositoryError>;
 
     async fn delete_summoner_by_name_and_tag(
         &self,
@@ -454,6 +465,74 @@ impl Repository for PgRepository {
             .fetch_all(&self.pool)
             .await?;
         Ok(configs)
+    }
+
+    async fn insert_analysis_history(
+        &self,
+        entry: &NewAnalysisHistory,
+    ) -> Result<(), RepositoryError> {
+        sqlx::query(
+            r#"
+            INSERT INTO analysis_history
+                (riot_puuid, match_id, role, champion_name, win, overall_rating, analysis_data)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (riot_puuid, match_id) DO UPDATE SET
+                role = EXCLUDED.role,
+                champion_name = EXCLUDED.champion_name,
+                win = EXCLUDED.win,
+                overall_rating = EXCLUDED.overall_rating,
+                analysis_data = EXCLUDED.analysis_data,
+                created_at = NOW()
+            "#,
+        )
+        .bind(&entry.riot_puuid)
+        .bind(&entry.match_id)
+        .bind(&entry.role)
+        .bind(&entry.champion_name)
+        .bind(entry.win)
+        .bind(&entry.overall_rating)
+        .bind(&entry.analysis_data)
+        .execute(&self.pool)
+        .await?;
+
+        // Bound growth: keep only the most recent snapshots per player.
+        sqlx::query(
+            r#"
+            DELETE FROM analysis_history
+            WHERE riot_puuid = $1
+              AND id NOT IN (
+                SELECT id FROM analysis_history
+                WHERE riot_puuid = $1
+                ORDER BY created_at DESC
+                LIMIT 25
+              )
+            "#,
+        )
+        .bind(&entry.riot_puuid)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    async fn get_recent_analysis_history(
+        &self,
+        riot_puuid: &str,
+        limit: i64,
+    ) -> Result<Vec<AnalysisHistoryEntry>, RepositoryError> {
+        let entries = sqlx::query_as::<_, AnalysisHistoryEntry>(
+            r#"
+            SELECT * FROM analysis_history
+            WHERE riot_puuid = $1
+            ORDER BY created_at DESC
+            LIMIT $2
+            "#,
+        )
+        .bind(riot_puuid)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(entries)
     }
 
     async fn delete_summoner_by_name_and_tag(
