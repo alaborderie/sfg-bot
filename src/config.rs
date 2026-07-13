@@ -9,7 +9,9 @@ pub struct Config {
     pub database_url: String,
     pub default_region: String,
     pub polling_interval_secs: u64,
-    pub gemini_api_key: Option<String>,
+    pub llm_api_key: Option<String>,
+    pub llm_base_url: String,
+    pub llm_model: String,
     pub analysis_prompts_dir: String,
     pub health_check_port: Option<u16>,
 }
@@ -44,7 +46,10 @@ impl Config {
             .parse()
             .unwrap_or(180);
 
-        let gemini_api_key = env::var("GEMINI_API_KEY").ok();
+        let llm_api_key = env::var("LLM_API_KEY").ok();
+        let llm_base_url =
+            env::var("LLM_BASE_URL").unwrap_or_else(|_| "http://jarvis:8080/v1".to_string());
+        let llm_model = env::var("LLM_MODEL").unwrap_or_else(|_| "gemma-4-26b".to_string());
         let analysis_prompts_dir =
             env::var("ANALYSIS_PROMPTS_DIR").unwrap_or_else(|_| "analysis_prompts".to_string());
         let health_check_port = env::var("HEALTH_CHECK_PORT")
@@ -62,7 +67,9 @@ impl Config {
             });
 
         tracing::info!(
-            has_gemini_api_key = gemini_api_key.is_some(),
+            has_llm_api_key = llm_api_key.is_some(),
+            llm_base_url = llm_base_url.as_str(),
+            llm_model = llm_model.as_str(),
             analysis_prompts_dir = analysis_prompts_dir.as_str(),
             health_check_port = ?health_check_port,
         );
@@ -74,7 +81,9 @@ impl Config {
             database_url,
             default_region,
             polling_interval_secs,
-            gemini_api_key,
+            llm_api_key,
+            llm_base_url,
+            llm_model,
             analysis_prompts_dir,
             health_check_port,
         }

@@ -21,6 +21,9 @@ pub enum RiotClientError {
     JsonError(#[from] serde_json::Error),
 }
 
+// riven::RiotApiError is ~200 bytes; boxing it would ripple through every
+// call site for no runtime win, so silence result_large_err on the mock.
+#[allow(clippy::result_large_err)]
 #[cfg_attr(feature = "test-mocks", mockall::automock)]
 #[async_trait]
 pub trait RiotApiClient: Send + Sync {

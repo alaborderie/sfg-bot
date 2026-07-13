@@ -4,7 +4,7 @@ use std::path::Path;
 
 use thiserror::Error;
 
-use crate::analysis::gemini::{GeminiClient, GeminiError};
+use crate::analysis::llm::{LlmClient, LlmError};
 use crate::analysis::models::{AnalysisData, AnalysisResult};
 use crate::analysis::roles::{ROLE_SPECS, RoleSpec, SkillImportance, spec_for};
 
@@ -29,8 +29,8 @@ const SKILL_NAMES: &[&str] = &[
 
 #[derive(Debug, Error)]
 pub enum AnalysisError {
-    #[error("Gemini error: {0}")]
-    GeminiError(#[from] GeminiError),
+    #[error("LLM error: {0}")]
+    LlmError(#[from] LlmError),
     #[error("Prompt file error: {0}")]
     PromptFileError(#[from] std::io::Error),
     #[error("Prompt directory error: {0}")]
@@ -41,7 +41,7 @@ pub enum AnalysisError {
 
 #[derive(Clone)]
 pub struct AnalysisPipeline {
-    gemini_client: GeminiClient,
+    llm_client: LlmClient,
     /// Final composed prompts (role intro + skill blocks) keyed by Riot role.
     role_prompts: HashMap<String, String>,
     /// Fallback used when no role-specific composed prompt exists.
@@ -49,7 +49,7 @@ pub struct AnalysisPipeline {
 }
 
 impl AnalysisPipeline {
-    pub fn new(gemini_client: GeminiClient, prompts_dir: &str) -> Result<Self, AnalysisError> {
+    pub fn new(llm_client: LlmClient, prompts_dir: &str) -> Result<Self, AnalysisError> {
         let dir_path = Path::new(prompts_dir);
 
         if !dir_path.is_dir() {
@@ -102,7 +102,7 @@ impl AnalysisPipeline {
         );
 
         Ok(Self {
-            gemini_client,
+            llm_client,
             role_prompts,
             default_prompt,
         })
@@ -120,7 +120,7 @@ impl AnalysisPipeline {
 
         let error_message = match serde_json::to_string_pretty(data) {
             Ok(data_json) => {
-                let result = self.gemini_client.analyze(prompt, &data_json).await;
+                let result = self.llm_client.analyze(prompt, &data_json).await;
 
                 match result {
                     Ok(text) => {
@@ -138,7 +138,7 @@ impl AnalysisPipeline {
                             summoner = data.summoner_name.as_str(),
                             role = data.role.as_str(),
                             error = %error,
-                            "Gemini analysis failed"
+                            "LLM analysis failed"
                         );
                         error.to_string()
                     }
@@ -227,7 +227,7 @@ fn compose_prompt(intro: &str, spec: &RoleSpec, skills: &HashMap<&'static str, S
 }
 
 /// Strips YAML frontmatter from a prompt file so Claude agent metadata
-/// (`---\nname: ...\n---`) is not sent to Gemini as part of the system prompt.
+/// (`---\nname: ...\n---`) is not sent to the LLM as part of the system prompt.
 fn strip_frontmatter(raw: &str) -> &str {
     let trimmed = raw.trim_start_matches('\u{feff}');
     let Some(rest) = trimmed.strip_prefix("---") else {
@@ -256,9 +256,9 @@ fn strip_frontmatter(raw: &str) -> &str {
     raw
 }
 
-/// Extracts the overall rating from Gemini's response.
+/// Extracts the overall rating from the LLM's response.
 ///
-/// The prompt instructs Gemini to start the response with one of `Good`,
+/// The prompt instructs the LLM to start the response with one of `Good`,
 /// `Average`, or `Poor`. We pick the earliest **word-boundary** occurrence of
 /// any of those three terms (case-insensitive). This is more robust than a
 /// substring scan, which would:
@@ -362,8 +362,17 @@ mod tests {
         }
     }
 
+    fn make_client() -> LlmClient {
+        LlmClient::new(
+            "fake-key".to_string(),
+            "http://localhost:8080/v1".to_string(),
+            "gemma-4-26b".to_string(),
+        )
+        .unwrap()
+    }
+
     fn make_pipeline(dir: &TempDir) -> AnalysisPipeline {
-        let client = GeminiClient::new("fake-key".to_string()).unwrap();
+        let client = make_client();
         AnalysisPipeline::new(client, dir.path().to_str().unwrap()).unwrap()
     }
 
@@ -486,7 +495,7 @@ mod tests {
 
     #[test]
     fn new_fails_when_directory_missing() {
-        let client = GeminiClient::new("fake-key".to_string()).unwrap();
+        let client = make_client();
         let result = AnalysisPipeline::new(client, "/nonexistent/path");
         assert!(result.is_err());
     }
@@ -496,7 +505,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("top.md"), "Top prompt").unwrap();
 
-        let client = GeminiClient::new("fake-key".to_string()).unwrap();
+        let client = make_client();
         let result = AnalysisPipeline::new(client, dir.path().to_str().unwrap());
         assert!(result.is_err());
     }
