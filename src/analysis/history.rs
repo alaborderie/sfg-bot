@@ -24,8 +24,10 @@ pub async fn analyze_with_memory<D: Repository + ?Sized>(
     riot_puuid: &str,
     match_id: &str,
 ) -> AnalysisResult {
+    // Fetch one extra row: the current match may be among the most recent
+    // snapshots (e.g. /analyze-last-game reruns) and is excluded below.
     match repository
-        .get_recent_analysis_history(riot_puuid, RECENT_GAMES_LIMIT)
+        .get_recent_analysis_history(riot_puuid, RECENT_GAMES_LIMIT + 1)
         .await
     {
         Ok(entries) => data.recent_games = summaries_from_entries(&entries, match_id),
