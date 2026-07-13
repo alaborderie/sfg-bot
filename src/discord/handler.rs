@@ -1,5 +1,5 @@
 use crate::analysis::discord::{format_analysis_embed, format_analysis_error_embed};
-use crate::analysis::gemini::GeminiClient;
+use crate::analysis::llm::LlmClient;
 use crate::analysis::models::AnalysisResult;
 use crate::analysis::pipeline::AnalysisPipeline;
 use crate::config::Config;
@@ -40,12 +40,16 @@ impl Bot {
         riot_client: Arc<dyn RiotApiClient>,
         config: Config,
     ) -> Self {
-        let analysis_pipeline = match config.gemini_api_key.as_ref() {
+        let analysis_pipeline = match config.llm_api_key.as_ref() {
             Some(api_key) => {
-                let gemini_client = match GeminiClient::new(api_key.clone()) {
+                let llm_client = match LlmClient::new(
+                    api_key.clone(),
+                    config.llm_base_url.clone(),
+                    config.llm_model.clone(),
+                ) {
                     Ok(client) => client,
                     Err(error) => {
-                        tracing::warn!(error = %error, "Failed to initialize Gemini client");
+                        tracing::warn!(error = %error, "Failed to initialize LLM client");
                         return Self {
                             repository,
                             riot_client,
@@ -56,7 +60,7 @@ impl Bot {
                     }
                 };
 
-                match AnalysisPipeline::new(gemini_client, &config.analysis_prompts_dir) {
+                match AnalysisPipeline::new(llm_client, &config.analysis_prompts_dir) {
                     Ok(pipeline) => Some(Arc::new(pipeline)),
                     Err(error) => {
                         tracing::warn!(error = %error, "Failed to load analysis prompt");
@@ -65,7 +69,7 @@ impl Bot {
                 }
             }
             None => {
-                tracing::info!("Gemini API key not configured, analysis disabled");
+                tracing::info!("LLM API key not configured, analysis disabled");
                 None
             }
         };
@@ -585,7 +589,9 @@ mod tests {
             database_url: "postgres://localhost/test".to_string(),
             default_region: "euw1".to_string(),
             polling_interval_secs: 180,
-            gemini_api_key: None,
+            llm_api_key: None,
+            llm_base_url: "http://localhost:8080/v1".to_string(),
+            llm_model: "gemma-4-26b".to_string(),
             analysis_prompts_dir: "analysis_prompts".to_string(),
             health_check_port: None,
         }

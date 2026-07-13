@@ -1,14 +1,14 @@
 # analysis/
 
-AI-powered post-game analysis using Google Gemini API.
+AI-powered post-game analysis using a self-hosted LLM (Gemma 4) behind an OpenAI-compatible API.
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `gemini.rs` | `GeminiClient` — HTTP client for Gemini API. Handles request formatting, retry with exponential backoff, rate limit (429) handling |
+| `llm.rs` | `LlmClient` — HTTP client for the OpenAI-compatible LLM API (`/chat/completions`). Handles request formatting, retry with exponential backoff, rate limit (429) handling |
 | `models.rs` | `AnalysisData` (match stats + timeline diffs for prompt context), `AnalysisResult` (rating enum + summary text) |
-| `pipeline.rs` | `AnalysisPipeline` — loads role intro + shared skill blocks, composes a per-role prompt at startup, serializes match data as JSON, calls Gemini, extracts rating |
+| `pipeline.rs` | `AnalysisPipeline` — loads role intro + shared skill blocks, composes a per-role prompt at startup, serializes match data as JSON, calls the LLM, extracts rating |
 | `roles.rs` | `RoleSpec` table — for each Riot role, lists which shared skills apply with `SkillImportance` and role-specific benchmark / tactical-note strings |
 | `discord.rs` | Embed formatters for analysis results — rating-based color coding, description truncation for Discord limits |
 
@@ -16,25 +16,27 @@ AI-powered post-game analysis using Google Gemini API.
 
 ### Pipeline Flow
 
-1. `AnalysisPipeline::new(gemini_client, prompts_dir)` loads role-specific prompt files (`top.md`, `jungle.md`, `middle.md`, `bottom.md`, `support.md`) into a `HashMap` + a `default.md` fallback
+1. `AnalysisPipeline::new(llm_client, prompts_dir)` loads role-specific prompt files (`top.md`, `jungle.md`, `middle.md`, `bottom.md`, `support.md`) into a `HashMap` + a `default.md` fallback
 2. `analyze_game(&self, data: &AnalysisData)` called after game ends
 3. Selects prompt by player's role; falls back to `default.md` if role not found
 4. Serializes `AnalysisData` as JSON (`data_json`)
-5. Calls `gemini_client.analyze(prompt, &data_json)`
+5. Calls `llm_client.analyze(prompt, &data_json)`
 6. Extracts rating via `extract_overall_rating()` — parses `Good`/`Average`/`Poor` from response
 7. Returns `AnalysisResult` for embed formatting
 
-### Gemini Client (gemini.rs)
+### LLM Client (llm.rs)
 
 - Uses `reqwest` for HTTP
-- Endpoint: `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
+- Endpoint: `{LLM_BASE_URL}/chat/completions` (OpenAI-compatible; default base URL `http://jarvis:8080/v1`)
+- Model name sent in the request body comes from `LLM_MODEL` (default `gemma-4-26b` — the llama.cpp alias for the local Gemma 4 model)
 - Retry logic: exponential backoff on 429 (rate limit) and 5xx errors
-- API key passed as query parameter
+- API key passed as `Authorization: Bearer` header
+- Gemma 4 is a reasoning model: it spends tokens on `reasoning_content` before the visible answer, so `MAX_TOKENS` is 4096 and the HTTP timeout is 300s (local generation runs ~30 tokens/s); an empty `content` field is treated as `ParseError`
 
 ### Error Handling
 
-- `GeminiError` — manual `impl Error` (not thiserror): `HttpError`, `ApiError`, `ParseError`, `RateLimited`, `Timeout`
-- `AnalysisError` — manual `impl Error`: `GeminiError`, `PromptFileError`, `PromptDirError`, `SerializationError`
+- `LlmError` — thiserror derive: `HttpError`, `ApiError`, `ParseError`, `RateLimited`, `Timeout`
+- `AnalysisError` — thiserror derive: `LlmError`, `PromptFileError`, `PromptDirError`, `SerializationError`
 
 ### Analysis Output
 
@@ -47,8 +49,8 @@ AI-powered post-game analysis using Google Gemini API.
 - Directory configured via `ANALYSIS_PROMPTS_DIR` env var (default: `analysis_prompts/`)
 - Role-specific files at the root: `top.md`, `jungle.md`, `middle.md`, `bottom.md`, `support.md` — these are the **role intro** (identity, tactics, matchup advice).
 - Fallback: `default.md` used when role has no specific prompt.
-- Each prompt file is a Claude agent definition: YAML frontmatter (`name`, `description`, `model`) followed by the prompt body. `pipeline::strip_frontmatter` removes the frontmatter before the body is sent to Gemini, so the metadata never reaches the model.
-- Prompts written in French, instruct Gemini to produce French output.
+- Each prompt file is a Claude agent definition: YAML frontmatter (`name`, `description`, `model`) followed by the prompt body. `pipeline::strip_frontmatter` removes the frontmatter before the body is sent to the LLM, so the metadata never reaches the model.
+- Prompts written in French, instruct the LLM to produce French output.
 - When adding a new role: create `{role}.md` with a frontmatter block, register `(<RIOT_ROLE>, "<role>.md")` in `ROLE_PROMPT_FILES` in `pipeline.rs`, and add a matching `RoleSpec` const in `roles.rs`.
 
 ### Shared skills (`analysis_prompts/skills/`)

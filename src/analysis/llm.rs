@@ -5,114 +5,104 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::time::sleep;
 
-const DEFAULT_MODEL: &str = "gemini-3.1-flash-lite";
 const MAX_ATTEMPTS: usize = 3;
-const REQUEST_TIMEOUT_SECS: u64 = 30;
+// The local Gemma 4 server generates ~30 tokens/s and spends part of the
+// budget on reasoning tokens before the visible answer, so both the token
+// budget and the HTTP timeout are much larger than a hosted-API setup.
+const MAX_TOKENS: u32 = 4096;
+const REQUEST_TIMEOUT_SECS: u64 = 300;
 
 #[derive(Clone)]
-pub struct GeminiClient {
+pub struct LlmClient {
     client: reqwest::Client,
     api_key: String,
     model: String,
+    base_url: String,
 }
 
 #[derive(Debug, Error)]
-pub enum GeminiError {
+pub enum LlmError {
     #[error("HTTP error: {0}")]
     HttpError(#[from] reqwest::Error),
-    #[error("Gemini API error: {0}")]
+    #[error("LLM API error: {0}")]
     ApiError(String),
-    #[error("Gemini parse error: {0}")]
+    #[error("LLM parse error: {0}")]
     ParseError(String),
-    #[error("Gemini API rate limited")]
+    #[error("LLM API rate limited")]
     RateLimited,
-    #[error("Gemini API request timed out")]
+    #[error("LLM API request timed out")]
     Timeout,
 }
 
 #[derive(Debug, Serialize)]
-struct GeminiRequest {
-    contents: Vec<GeminiContent>,
-    #[serde(rename = "generationConfig")]
-    generation_config: GenerationConfig,
+struct LlmRequest {
+    model: String,
+    messages: Vec<LlmMessage>,
+    temperature: Option<f32>,
+    max_tokens: Option<u32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct GeminiContent {
-    parts: Vec<GeminiPart>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum LlmRole {
+    System,
+    User,
+    Assistant,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct GeminiPart {
-    text: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GenerationConfig {
-    temperature: f32,
-    max_output_tokens: u32,
-}
-
-#[derive(Debug, Deserialize)]
-struct GeminiResponse {
-    candidates: Vec<GeminiCandidate>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LlmMessage {
+    pub role: LlmRole,
+    pub content: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct GeminiCandidate {
-    content: GeminiContentResponse,
+struct LlmResponse {
+    choices: Vec<LlmChoice>,
 }
 
 #[derive(Debug, Deserialize)]
-struct GeminiContentResponse {
-    parts: Vec<GeminiPartResponse>,
+struct LlmChoice {
+    message: LlmMessage,
 }
 
-#[derive(Debug, Deserialize)]
-struct GeminiPartResponse {
-    text: Option<String>,
-}
-
-impl GeminiClient {
-    pub fn new(api_key: String) -> Result<Self, GeminiError> {
+impl LlmClient {
+    pub fn new(api_key: String, base_url: String, model: String) -> Result<Self, LlmError> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
             .build()
-            .map_err(GeminiError::HttpError)?;
+            .map_err(LlmError::HttpError)?;
 
         Ok(Self {
             client,
             api_key,
-            model: DEFAULT_MODEL.to_string(),
+            model,
+            base_url,
         })
     }
 
-    pub async fn analyze(&self, prompt: &str, data_json: &str) -> Result<String, GeminiError> {
+    pub async fn analyze(&self, prompt: &str, data_json: &str) -> Result<String, LlmError> {
         let prompt_text = build_prompt_text(prompt, data_json);
 
-        let request_body = GeminiRequest {
-            contents: vec![GeminiContent {
-                parts: vec![GeminiPart { text: prompt_text }],
+        let request_body = LlmRequest {
+            model: self.model.clone(),
+            messages: vec![LlmMessage {
+                role: LlmRole::User,
+                content: prompt_text,
             }],
-            generation_config: GenerationConfig {
-                temperature: 0.7,
-                max_output_tokens: 1024,
-            },
+            temperature: Some(0.7),
+            max_tokens: Some(MAX_TOKENS),
         };
 
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
-            self.model
-        );
+        let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
 
-        let mut last_error: Option<GeminiError> = None;
+        let mut last_error: Option<LlmError> = None;
 
         for attempt in 0..MAX_ATTEMPTS {
             let response = self
                 .client
                 .post(&url)
-                .header("x-goog-api-key", &self.api_key)
+                .header("Authorization", format!("Bearer {}", self.api_key))
                 .json(&request_body)
                 .send()
                 .await;
@@ -121,19 +111,18 @@ impl GeminiClient {
                 Ok(resp) => {
                     let status = resp.status();
                     if status.is_success() {
-                        let parsed: GeminiResponse =
-                            resp.json().await.map_err(GeminiError::HttpError)?;
+                        let parsed: LlmResponse = resp.json().await.map_err(LlmError::HttpError)?;
 
                         return extract_response_text(parsed);
                     }
 
                     if status == StatusCode::TOO_MANY_REQUESTS {
-                        last_error = Some(GeminiError::RateLimited);
+                        last_error = Some(LlmError::RateLimited);
                         if attempt + 1 < MAX_ATTEMPTS {
                             sleep(Duration::from_secs(1 << attempt)).await;
                             continue;
                         }
-                        return Err(GeminiError::RateLimited);
+                        return Err(LlmError::RateLimited);
                     }
 
                     if status.is_client_error() {
@@ -141,7 +130,7 @@ impl GeminiClient {
                             .text()
                             .await
                             .unwrap_or_else(|_| "<response body unavailable>".to_string());
-                        return Err(GeminiError::ApiError(body_text));
+                        return Err(LlmError::ApiError(body_text));
                     }
 
                     let body_text = resp
@@ -150,20 +139,20 @@ impl GeminiClient {
                         .unwrap_or_else(|_| "<response body unavailable>".to_string());
 
                     if status.is_server_error() {
-                        last_error = Some(GeminiError::ApiError(body_text.clone()));
+                        last_error = Some(LlmError::ApiError(body_text.clone()));
                         if attempt + 1 < MAX_ATTEMPTS {
                             sleep(Duration::from_secs(1 << attempt)).await;
                             continue;
                         }
                     }
 
-                    return Err(GeminiError::ApiError(body_text));
+                    return Err(LlmError::ApiError(body_text));
                 }
                 Err(error) => {
                     if error.is_timeout() {
-                        last_error = Some(GeminiError::Timeout);
+                        last_error = Some(LlmError::Timeout);
                     } else {
-                        last_error = Some(GeminiError::HttpError(error));
+                        last_error = Some(LlmError::HttpError(error));
                     }
                 }
             }
@@ -173,8 +162,7 @@ impl GeminiClient {
             }
         }
 
-        Err(last_error
-            .unwrap_or_else(|| GeminiError::ApiError("Unknown Gemini API error".to_string())))
+        Err(last_error.unwrap_or_else(|| LlmError::ApiError("Unknown LLM API error".to_string())))
     }
 }
 
@@ -186,14 +174,16 @@ fn build_prompt_text(prompt: &str, data_json: &str) -> String {
     }
 }
 
-fn extract_response_text(parsed: GeminiResponse) -> Result<String, GeminiError> {
+fn extract_response_text(parsed: LlmResponse) -> Result<String, LlmError> {
     parsed
-        .candidates
+        .choices
         .first()
-        .and_then(|candidate| candidate.content.parts.first())
-        .and_then(|part| part.text.clone())
+        .map(|choice| choice.message.content.clone())
+        .filter(|content| !content.trim().is_empty())
         .ok_or_else(|| {
-            GeminiError::ParseError("Missing candidates content in Gemini response".to_string())
+            // Reasoning models can exhaust max_tokens before emitting any
+            // visible answer, which surfaces as an empty `content` field.
+            LlmError::ParseError("Missing or empty content in LLM response".to_string())
         })
 }
 
@@ -221,12 +211,11 @@ mod tests {
 
     #[test]
     fn extract_response_text_returns_text_when_present() {
-        let parsed = GeminiResponse {
-            candidates: vec![GeminiCandidate {
-                content: GeminiContentResponse {
-                    parts: vec![GeminiPartResponse {
-                        text: Some("Great game".to_string()),
-                    }],
+        let parsed = LlmResponse {
+            choices: vec![LlmChoice {
+                message: LlmMessage {
+                    role: LlmRole::Assistant,
+                    content: "Great game".to_string(),
                 },
             }],
         };
@@ -237,43 +226,48 @@ mod tests {
 
     #[test]
     fn extract_response_text_returns_error_when_missing() {
-        let parsed = GeminiResponse {
-            candidates: vec![GeminiCandidate {
-                content: GeminiContentResponse { parts: vec![] },
+        let parsed = LlmResponse { choices: vec![] };
+
+        let error = extract_response_text(parsed).expect_err("expected parse error");
+        assert!(matches!(error, LlmError::ParseError(_)));
+    }
+
+    #[test]
+    fn extract_response_text_returns_error_when_content_empty() {
+        let parsed = LlmResponse {
+            choices: vec![LlmChoice {
+                message: LlmMessage {
+                    role: LlmRole::Assistant,
+                    content: "  ".to_string(),
+                },
             }],
         };
 
         let error = extract_response_text(parsed).expect_err("expected parse error");
-        assert!(matches!(error, GeminiError::ParseError(_)));
+        assert!(matches!(error, LlmError::ParseError(_)));
     }
 
     #[test]
-    fn gemini_request_serializes_with_generation_config() {
-        let request = GeminiRequest {
-            contents: vec![GeminiContent {
-                parts: vec![GeminiPart {
-                    text: "Hello".to_string(),
-                }],
+    fn llm_request_serializes_correctly() {
+        let request = LlmRequest {
+            model: "gemma-4".to_string(),
+            messages: vec![LlmMessage {
+                role: LlmRole::User,
+                content: "Hello".to_string(),
             }],
-            generation_config: GenerationConfig {
-                temperature: 0.7,
-                max_output_tokens: 1024,
-            },
+            temperature: Some(0.7),
+            max_tokens: Some(1024),
         };
 
         let value = serde_json::to_value(&request).expect("serialize request");
-        assert!(value.get("contents").is_some());
-        let config = value
-            .get("generationConfig")
-            .expect("generationConfig missing");
-        let temperature = config
+        assert_eq!(value.get("model").unwrap(), "gemma-4");
+        let temperature = value
             .get("temperature")
             .and_then(serde_json::Value::as_f64)
             .expect("temperature missing or not a number");
         assert!((temperature - 0.7).abs() < 1e-6);
-        assert_eq!(
-            config.get("maxOutputTokens"),
-            Some(&serde_json::json!(1024))
-        );
+        assert_eq!(value.get("max_tokens").unwrap(), &serde_json::json!(1024));
+        let role = value["messages"][0]["role"].as_str().unwrap();
+        assert_eq!(role, "user");
     }
 }

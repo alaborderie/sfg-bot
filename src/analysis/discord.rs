@@ -23,7 +23,7 @@ pub fn format_analysis_embed(result: &AnalysisResult) -> CreateEmbed {
         .title(title)
         .description(truncate_description(&description))
         .colour(colour)
-        .footer(CreateEmbedFooter::new("Propulsé par Gemini Flash Lite"))
+        .footer(CreateEmbedFooter::new("Propulsé par Gemma 4"))
 }
 
 pub fn format_analysis_error_embed(summoner_name: &str, error_msg: &str) -> CreateEmbed {
@@ -33,7 +33,7 @@ pub fn format_analysis_error_embed(summoner_name: &str, error_msg: &str) -> Crea
             "⚠️ Analyse indisponible : {error_msg}"
         )))
         .colour(Colour::from_rgb(149, 165, 166))
-        .footer(CreateEmbedFooter::new("Propulsé par Gemini Flash Lite"))
+        .footer(CreateEmbedFooter::new("Propulsé par Gemma 4"))
 }
 
 fn rating_colour(rating: Option<&str>) -> Colour {

@@ -1,4 +1,7 @@
 #![cfg(feature = "test-mocks")]
+// Mock closures return Result<_, RiotClientError>, whose riven variant is
+// ~200 bytes; boxing it in production just for this lint isn't worth it.
+#![allow(clippy::result_large_err)]
 
 use chrono::Utc;
 use mockall::predicate::*;

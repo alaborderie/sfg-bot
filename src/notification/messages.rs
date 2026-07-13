@@ -210,7 +210,7 @@ pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult)
 
     let value_field = format!(
         "💎 {} · {} · {} {}",
-        match_result.champion_name, &match_result.role, result_char, kda
+        match_result.champion_name, match_result.role, result_char, kda
     );
 
     let stats_line = format_stats_line(

@@ -8,7 +8,7 @@
 //!
 //! The benchmarks below target the Platine/Émeraude range; they are
 //! intentionally narrative (paragraph-style French) because they're spliced
-//! verbatim into the prompt body sent to Gemini.
+//! verbatim into the prompt body sent to the LLM.
 
 /// How much weight a role places on a given metric. Drives both
 /// inclusion (`NotApplicable` skips the skill entirely) and framing in
