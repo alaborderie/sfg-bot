@@ -477,6 +477,9 @@ impl Repository for PgRepository {
                 (riot_puuid, match_id, role, champion_name, win, overall_rating, analysis_data)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (riot_puuid, match_id) DO UPDATE SET
+                role = EXCLUDED.role,
+                champion_name = EXCLUDED.champion_name,
+                win = EXCLUDED.win,
                 overall_rating = EXCLUDED.overall_rating,
                 analysis_data = EXCLUDED.analysis_data,
                 created_at = NOW()
