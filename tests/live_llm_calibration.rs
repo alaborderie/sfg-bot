@@ -11,7 +11,7 @@
 //! `LLM_MODEL` (default `gemma-4-26b`), `LLM_API_KEY` (default `test`).
 
 use sfg_bot::analysis::llm::LlmClient;
-use sfg_bot::analysis::models::{AnalysisData, AnalysisResult};
+use sfg_bot::analysis::models::{AnalysisData, AnalysisResult, RecentGameSummary};
 use sfg_bot::analysis::pipeline::AnalysisPipeline;
 
 fn live_pipeline() -> AnalysisPipeline {
@@ -60,6 +60,7 @@ fn base_data() -> AnalysisData {
         game_duration_secs: 1800,
         role: "TOP".to_string(),
         game_mode: "CLASSIC".to_string(),
+        recent_games: Vec::new(),
     }
 }
 
@@ -204,4 +205,71 @@ async fn lost_lane_won_game_parses_and_is_not_poor() {
         result.summary
     );
     println!("lost_lane_won_game rating={rating}\n{}", result.summary);
+}
+
+#[tokio::test]
+#[ignore = "requires the live LLM server"]
+async fn memory_progression_is_mentioned() {
+    // Previous games: brutal early CS deficits. Current game: even lane.
+    // The coach should open with a sentence situating the progression.
+    let pipeline = live_pipeline();
+    let mut data = base_data();
+    data.kills = 6;
+    data.deaths = 3;
+    data.assists = 7;
+    data.kda = Some(4.3);
+    data.cs_diff_at_10 = Some(5);
+    data.gold_diff_at_10 = Some(250);
+    data.cs_diff_at_15 = Some(8);
+    data.cs_diff_at_20 = Some(10);
+    data.turret_kills = 2;
+    data.recent_games = vec![
+        RecentGameSummary {
+            champion_name: "Gangplank".to_string(),
+            role: "TOP".to_string(),
+            win: true,
+            overall_rating: Some("Average".to_string()),
+            kills: 10,
+            deaths: 8,
+            assists: 5,
+            cs_per_minute: Some(4.7),
+            cs_diff_at_10: Some(-22),
+            gold_diff_at_10: Some(-1287),
+            damage_per_minute: Some(720.0),
+            vision_score_per_minute: Some(0.9),
+        },
+        RecentGameSummary {
+            champion_name: "Gangplank".to_string(),
+            role: "TOP".to_string(),
+            win: false,
+            overall_rating: Some("Poor".to_string()),
+            kills: 2,
+            deaths: 7,
+            assists: 4,
+            cs_per_minute: Some(4.2),
+            cs_diff_at_10: Some(-30),
+            gold_diff_at_10: Some(-1500),
+            damage_per_minute: Some(400.0),
+            vision_score_per_minute: Some(0.8),
+        },
+    ];
+
+    let result = pipeline.analyze_game(&data).await;
+    let rating = assert_well_formed(&result);
+    let lower = result.summary.to_lowercase();
+    let progression_markers = [
+        "progr",
+        "amélior",
+        "mieux",
+        "par rapport",
+        "dernière",
+        "dernières",
+        "précédent",
+    ];
+    assert!(
+        progression_markers.iter().any(|m| lower.contains(m)),
+        "expected a progression mention, got: {}",
+        result.summary
+    );
+    println!("memory_progression rating={rating}\n{}", result.summary);
 }

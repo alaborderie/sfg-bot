@@ -27,7 +27,7 @@ PostgreSQL database layer — connection pool, repository trait, and data models
 
 ### Repository Trait (repository.rs)
 
-- 19 async methods covering CRUD for: summoners, active_games, match_history, champions, notification_events, bot_config
+- Async methods covering CRUD for: summoners, active_games, match_history, champions, notification_events, bot_config, analysis_history (per-player memory of AI analyses, pruned to 25 rows per puuid on insert)
 - `RepositoryError` wraps `sqlx::Error` via thiserror `#[from]`
 - `#[cfg_attr(feature = "test-mocks", mockall::automock)]` enables mock generation for tests
 

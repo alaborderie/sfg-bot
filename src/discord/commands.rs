@@ -485,6 +485,7 @@ pub async fn run(
     ctx: &Context,
     command: &serenity::model::application::CommandInteraction,
     riot_client: &Arc<dyn RiotApiClient>,
+    repository: &Arc<dyn Repository>,
     analysis_pipeline: &Option<Arc<AnalysisPipeline>>,
     default_region: &str,
 ) {
@@ -677,7 +678,14 @@ pub async fn run(
         }
     };
 
-    let result = pipeline.analyze_game(&analysis_data).await;
+    let result = crate::analysis::history::analyze_with_memory(
+        repository.as_ref(),
+        pipeline,
+        analysis_data,
+        &summoner_info.puuid,
+        &match_id,
+    )
+    .await;
 
     let embed = if result.error.is_some() {
         format_analysis_error_embed(

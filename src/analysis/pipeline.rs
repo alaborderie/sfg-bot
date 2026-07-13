@@ -404,6 +404,7 @@ mod tests {
             game_duration_secs: 2100,
             role: "MIDDLE".to_string(),
             game_mode: "CLASSIC".to_string(),
+            recent_games: Vec::new(),
         }
     }
 

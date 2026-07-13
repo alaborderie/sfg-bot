@@ -357,6 +357,7 @@ impl RiotApiClient for RiotClient {
             game_duration_secs: match_data.info.game_duration as i32,
             role: participant.team_position.clone(),
             game_mode: match_data.info.game_mode.to_string(),
+            recent_games: Vec::new(),
         }))
     }
 

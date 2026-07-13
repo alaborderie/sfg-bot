@@ -11,6 +11,7 @@ AI-powered post-game analysis using a self-hosted LLM (Gemma 4) behind an OpenAI
 | `pipeline.rs` | `AnalysisPipeline` — loads role intro + shared skill blocks, composes a per-role prompt at startup, serializes match data as JSON, calls the LLM, extracts rating |
 | `roles.rs` | `RoleSpec` table — for each Riot role, lists which shared skills apply with `SkillImportance` and role-specific benchmark / tactical-note strings |
 | `discord.rs` | Embed formatters for analysis results — rating-based color coding, description truncation for Discord limits |
+| `history.rs` | Per-player analysis memory — `analyze_with_memory` fetches the last 5 snapshots from `analysis_history`, injects them as `AnalysisData::recent_games`, runs the analysis, then stores this game's snapshot (history stripped so snapshots never nest) |
 
 ## Key Details
 
@@ -62,6 +63,13 @@ AI-powered post-game analysis using a self-hosted LLM (Gemma 4) behind an OpenAI
 - Loaded by `load_shared_sections`; missing files are skipped with a warning (same robustness contract as skills).
 - The pipeline appends a final `## Données de la partie (JSON)` section carrying the `{game_data}` placeholder — prompt files must NOT contain `{game_data}` themselves.
 - Live calibration harness: `cargo test --test live_llm_calibration -- --ignored --test-threads=1` runs real scenarios against the local LLM server and asserts rating calibration (stomp-win is never Poor, disaster-loss is never Good, etc.).
+
+### Game memory (history.rs)
+
+- Both analysis entry points (auto post-game in `handler::spawn_analysis_task`, manual `/analyze-last-game` in `commands::run`) go through `history::analyze_with_memory` — do not call `pipeline.analyze_game` directly from Discord code.
+- History failures degrade to a memory-less analysis (logged warning); they never block the analysis.
+- Snapshots are JSON-serialized `AnalysisData` in the `analysis_history.analysis_data` TEXT column; the current match is excluded on read so `/analyze-last-game` reruns don't compare a game to itself.
+- `shared/response_format.md` instructs the coach to open with one progression/regression sentence when `recent_games` is non-empty.
 
 ### Shared skills (`analysis_prompts/skills/`)
 

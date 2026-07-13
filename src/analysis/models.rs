@@ -37,6 +37,29 @@ pub struct AnalysisData {
     pub game_duration_secs: i32,
     pub role: String,
     pub game_mode: String,
+    /// Summaries of the player's previously analyzed games, most recent
+    /// first. Empty when no history exists; omitted from the prompt JSON
+    /// when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recent_games: Vec<RecentGameSummary>,
+}
+
+/// Compact summary of a previously analyzed game, injected into the prompt
+/// data so the coach can comment on progression across games.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecentGameSummary {
+    pub champion_name: String,
+    pub role: String,
+    pub win: bool,
+    pub overall_rating: Option<String>,
+    pub kills: i32,
+    pub deaths: i32,
+    pub assists: i32,
+    pub cs_per_minute: Option<f32>,
+    pub cs_diff_at_10: Option<i32>,
+    pub gold_diff_at_10: Option<i32>,
+    pub damage_per_minute: Option<f32>,
+    pub vision_score_per_minute: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
