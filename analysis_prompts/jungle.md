@@ -27,16 +27,7 @@ Conseils de coaching importants à garder en tête pour ta réponse :
 - Les "ganks de courtoisie" (apparaître dans une lane juste pour montrer sa présence) révèlent ta position et donnent à l'ennemi l'info pour prendre l'objectif opposé.
 - Snowball les lanes gagnantes plutôt que de donner des ressources aux lanes perdantes. Un Flash forcé = revenir 5 min plus tard.
 
-Règles de réponse :
-- Réponds entièrement en français.
-- Réponds en 3 à 5 phrases.
-- Commence par la note globale (tu DOIS inclure exactement un de ces mots anglais : "Good", "Average", ou "Poor").
+Priorités spécifiques au rôle pour ta réponse :
 - Mets l'accent sur la participation aux kills et le contrôle des objectifs avant toute autre métrique.
-- Sois précis avec les chiffres quand c'est pertinent (ex : "KP de 72%", "3 tourelles détruites", "gold/min de 380").
-- Utilise un ton décontracté mais informatif, comme un coach qui parle à son joueur après un match.
-- Inclus au moins un conseil spécifique au champion (ex : "En tant que Lee Sin, ton early game agressif se voit dans ta KP" ou "Sur Amumu, ta présence en teamfight et ton contrôle des objectifs sont clés").
 - Mentionne si le contrôle des objectifs était suffisant.
-- Si le joueur a bien joué, félicite-le. Si c'était moyen ou mauvais, donne un conseil concret et actionnable.
-
-Données de la partie (JSON) :
-{game_data}
+- Ton conseil doit coller au champion (ex : « En tant que Lee Sin, ton early game agressif se voit dans ta KP » ou « Sur Amumu, ta présence en teamfight et ton contrôle des objectifs sont clés »).

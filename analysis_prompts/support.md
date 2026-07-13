@@ -26,16 +26,7 @@ Conseils de coaching importants à garder en tête pour ta réponse :
 - Le premier ward doit être posé à 1:10-1:20 dans l'entrée deep du river pour tracker le premier chemin du jungler ennemi — pas dans le bush de lane.
 - Les timings de recall sont critiques : après un kill en lane, push la vague, recall proprement, et acheter AVANT la prochaine interaction de vague. Rester à la tourelle après un kill sans push = perte de tempo.
 
-Règles de réponse :
-- Réponds entièrement en français.
-- Réponds en 3 à 5 phrases.
-- Commence par la note globale (tu DOIS inclure exactement un de ces mots anglais : "Good", "Average", ou "Poor").
+Priorités spécifiques au rôle pour ta réponse :
 - Mets l'accent sur le score de vision et la participation aux kills avant toute autre métrique.
-- Sois précis avec les chiffres quand c'est pertinent (ex : "vision score/min de 1.8", "KP de 78%", "15 assists").
-- Utilise un ton décontracté mais informatif, comme un coach qui parle à son joueur après un match.
-- Inclus au moins un conseil spécifique au champion (ex : "En tant que Leona, ta KP de 80% montre un bon engage" ou "Sur Lulu, ton ult défensif est plus précieux que d'engager — garde-le pour counter les dives").
 - Ne critique PAS un faible CS ou gold — c'est normal pour un support.
-- Si le joueur a bien joué, félicite-le. Si c'était moyen ou mauvais, donne un conseil concret et actionnable.
-
-Données de la partie (JSON) :
-{game_data}
+- Ton conseil doit coller au champion (ex : « En tant que Leona, ta KP de 80% montre un bon engage » ou « Sur Lulu, garde ton ult pour counter les dives plutôt que d'engager »).

@@ -19,6 +19,12 @@ const ROLE_PROMPT_FILES: &[(&str, &str)] = &[
 
 const DEFAULT_PROMPT_FILE: &str = "default.md";
 const SKILLS_SUBDIR: &str = "skills";
+const SHARED_SUBDIR: &str = "shared";
+/// Shared prompt sections appended to every composed prompt, in this order.
+const SHARED_SECTION_FILES: &[&str] = &["rating_rubric", "response_format"];
+/// Trailing section holding the match JSON; `{game_data}` is substituted by
+/// `LlmClient::analyze` at request time.
+const GAME_DATA_SECTION: &str = "---\n\n## Données de la partie (JSON)\n\n{game_data}";
 const SKILL_NAMES: &[&str] = &[
     "cs_per_minute",
     "damage_per_minute",
@@ -59,7 +65,7 @@ impl AnalysisPipeline {
         }
 
         let default_prompt_path = dir_path.join(DEFAULT_PROMPT_FILE);
-        let default_prompt = fs::read_to_string(&default_prompt_path)
+        let default_intro = fs::read_to_string(&default_prompt_path)
             .map(|raw| strip_frontmatter(&raw).to_string())
             .map_err(|e| {
                 AnalysisError::PromptDirError(format!(
@@ -69,6 +75,9 @@ impl AnalysisPipeline {
             })?;
 
         let skills = load_skills(dir_path);
+        let shared = load_shared_sections(dir_path);
+
+        let default_prompt = finalize_prompt(compose_base(&default_intro, &shared));
 
         let mut role_prompts = HashMap::new();
         for (role, filename) in ROLE_PROMPT_FILES {
@@ -87,10 +96,10 @@ impl AnalysisPipeline {
             };
 
             let composed = match spec_for(role) {
-                Some(spec) => compose_prompt(&intro, spec, &skills),
-                None => intro,
+                Some(spec) => compose_prompt(&intro, spec, &skills, &shared),
+                None => compose_base(&intro, &shared),
             };
-            role_prompts.insert((*role).to_string(), composed);
+            role_prompts.insert((*role).to_string(), finalize_prompt(composed));
         }
 
         tracing::info!(
@@ -196,9 +205,64 @@ fn load_skills(prompts_dir: &Path) -> HashMap<&'static str, String> {
     out
 }
 
+/// Loads the shared prompt sections (rating rubric, response format) that are
+/// appended to every composed prompt. Missing files are skipped with a warning
+/// rather than failing startup, mirroring the skills loading behaviour.
+fn load_shared_sections(prompts_dir: &Path) -> Vec<String> {
+    let shared_dir = prompts_dir.join(SHARED_SUBDIR);
+    let mut out = Vec::new();
+    if !shared_dir.is_dir() {
+        tracing::warn!(
+            dir = %shared_dir.display(),
+            "Shared prompts directory not found; composed prompts will omit shared sections"
+        );
+        return out;
+    }
+    for name in SHARED_SECTION_FILES {
+        let path = shared_dir.join(format!("{name}.md"));
+        match fs::read_to_string(&path) {
+            Ok(raw) => out.push(strip_frontmatter(&raw).trim().to_string()),
+            Err(e) => {
+                tracing::warn!(
+                    section = *name,
+                    file = %path.display(),
+                    error = %e,
+                    "Shared prompt section not found, composed prompts will omit it"
+                );
+            }
+        }
+    }
+    out
+}
+
+/// Intro + shared sections, for prompts without a role spec (default prompt,
+/// unknown roles).
+fn compose_base(intro: &str, shared: &[String]) -> String {
+    let mut sections: Vec<String> = vec![intro.trim_end().to_string()];
+    sections.extend(shared.iter().cloned());
+    sections.join("\n\n")
+}
+
+/// Appends the game-data section unless the intro already carries its own
+/// `{game_data}` placeholder (kept for custom prompt directories that predate
+/// shared-section composition).
+fn finalize_prompt(composed: String) -> String {
+    if composed.contains("{game_data}") {
+        composed
+    } else {
+        format!("{composed}\n\n{GAME_DATA_SECTION}")
+    }
+}
+
 /// Composes the final per-role prompt: role intro + each applicable skill
-/// block with role-specific thresholds substituted in.
-fn compose_prompt(intro: &str, spec: &RoleSpec, skills: &HashMap<&'static str, String>) -> String {
+/// block with role-specific thresholds substituted in, followed by the shared
+/// sections.
+fn compose_prompt(
+    intro: &str,
+    spec: &RoleSpec,
+    skills: &HashMap<&'static str, String>,
+    shared: &[String],
+) -> String {
     let mut sections: Vec<String> = vec![intro.trim_end().to_string()];
 
     sections.push(String::from(
@@ -222,6 +286,8 @@ fn compose_prompt(intro: &str, spec: &RoleSpec, skills: &HashMap<&'static str, S
             sections.push(body);
         }
     }
+
+    sections.extend(shared.iter().cloned());
 
     sections.join("\n\n")
 }
@@ -508,6 +574,47 @@ mod tests {
         let client = make_client();
         let result = AnalysisPipeline::new(client, dir.path().to_str().unwrap());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn repo_prompts_compose_with_shared_sections() {
+        let pipeline = AnalysisPipeline::new(make_client(), "analysis_prompts").unwrap();
+
+        for role in [
+            "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY", "", "UNKNOWN",
+        ] {
+            let prompt = pipeline.get_prompt_for_role(role);
+            assert!(
+                prompt.contains("## Barème de notation"),
+                "rating rubric missing for role {role:?}"
+            );
+            assert!(
+                prompt.contains("## Format de réponse"),
+                "response format missing for role {role:?}"
+            );
+            assert_eq!(
+                prompt.matches("{game_data}").count(),
+                1,
+                "expected exactly one game_data placeholder for role {role:?}"
+            );
+            assert!(
+                prompt.trim_end().ends_with("{game_data}"),
+                "game data section must be last for role {role:?}"
+            );
+        }
+
+        let top = pipeline.get_prompt_for_role("TOP");
+        assert!(top.contains("Top Lane"));
+        assert!(top.contains("Référentiel par compétence"));
+        let referential = top.find("Référentiel par compétence").unwrap();
+        let rubric = top.find("## Barème de notation").unwrap();
+        let format = top.find("## Format de réponse").unwrap();
+        assert!(
+            referential < rubric && rubric < format,
+            "sections out of order: referential={referential} rubric={rubric} format={format}"
+        );
+
+        assert!(pipeline.get_prompt_for_role("UTILITY").contains("Support"));
     }
 
     #[test]

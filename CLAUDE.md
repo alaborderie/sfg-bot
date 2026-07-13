@@ -97,7 +97,7 @@ Summoners are managed at runtime via `/add-summoner`, `/remove-summoner`, and `/
 
 ## Analysis Prompts (Claude agent format)
 
-Files in `analysis_prompts/` (`default.md`, `top.md`, `jungle.md`, `middle.md`, `bottom.md`, `support.md`) are Claude-style agent definitions: a YAML frontmatter block (`name`, `description`, `model`) followed by the prompt body. The frontmatter is metadata only — `AnalysisPipeline::new` calls `strip_frontmatter` so only the body is sent to the LLM.
+Files in `analysis_prompts/` (`default.md`, `top.md`, `jungle.md`, `middle.md`, `bottom.md`, `support.md`, plus `skills/` and `shared/`) are Claude-style agent definitions: a YAML frontmatter block (`name`, `description`, `model`) followed by the prompt body. The frontmatter is metadata only — `AnalysisPipeline::new` calls `strip_frontmatter` so only the body is sent to the LLM. Role files hold the role intro; `skills/` holds per-metric blocks with role-substituted benchmarks; `shared/` holds the rating rubric and response format appended to every composed prompt.
 
 When editing prompts:
 - Keep the frontmatter block intact (opening `---` on line 1, closing `---` on its own line, prompt body after).

@@ -25,16 +25,7 @@ Conseils de coaching importants à garder en tête pour ta réponse :
 - Un ADC en retard doit freeze près de sa T2, éviter les 1v1, trouver du farm safe de l'autre côté des ennemis fed, et attendre UN bon fight pour effacer le déficit de gold.
 - Ne JAMAIS skip les fights d'objectif Baron/Dragon pour farmer — être absent d'un objectif majeur en tant qu'ADC est un throw direct.
 
-Règles de réponse :
-- Réponds entièrement en français.
-- Réponds en 3 à 5 phrases.
-- Commence par la note globale (tu DOIS inclure exactement un de ces mots anglais : "Good", "Average", ou "Poor").
+Priorités spécifiques au rôle pour ta réponse :
 - Mets l'accent sur l'efficacité CS/gold et l'output de dégâts avant toute autre métrique.
-- Sois précis avec les chiffres quand c'est pertinent (ex : "210 CS en 30 min", "32% des dégâts de l'équipe", "DPM de 650", "seulement 2 morts").
-- Utilise un ton décontracté mais informatif, comme un coach qui parle à son joueur après un match.
-- Inclus au moins un conseil spécifique au champion (ex : "En tant que Jinx, ton scaling se voit dans tes dégâts late game" ou "Sur Draven, ton avantage early devait se convertir en tourelles plus tôt").
 - Commente l'équilibre entre le farm et la présence en fight.
-- Si le joueur a bien joué, félicite-le. Si c'était moyen ou mauvais, donne un conseil concret et actionnable.
-
-Données de la partie (JSON) :
-{game_data}
+- Ton conseil doit coller au champion (ex : « En tant que Jinx, ton scaling se voit dans tes dégâts late game » ou « Sur Draven, ton avantage early devait se convertir en tourelles plus tôt »).

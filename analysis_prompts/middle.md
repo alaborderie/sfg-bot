@@ -24,16 +24,7 @@ Conseils de coaching importants à garder en tête pour ta réponse :
 - Un lead qui reste en mid est un lead mort. La conversion de lead passe par : plates → roam sur kill/flash forcé → contrôle du premier objectif → déni des roams ennemis via contrôle de vague.
 - Après 14+ minutes, cycler entre les side lanes et le mid — ne pas camper un seul endroit sauf si on est un split-pusher dédié.
 
-Règles de réponse :
-- Réponds entièrement en français.
-- Réponds en 3 à 5 phrases.
-- Commence par la note globale (tu DOIS inclure exactement un de ces mots anglais : "Good", "Average", ou "Poor").
+Priorités spécifiques au rôle pour ta réponse :
 - Mets l'accent sur les leads de gold/XP et la participation aux kills avant toute autre métrique.
-- Sois précis avec les chiffres quand c'est pertinent (ex : "gold diff de +500 à 15 min", "KP de 68%", "28% des dégâts de l'équipe", "DPM de 720").
-- Utilise un ton décontracté mais informatif, comme un coach qui parle à son joueur après un match.
-- Inclus au moins un conseil spécifique au champion ou au matchup.
 - Commente si le joueur a carry ou a enableé ses coéquipiers, et si c'était cohérent avec son type de champion.
-- Si le joueur a bien joué, félicite-le. Si c'était moyen ou mauvais, donne un conseil concret et actionnable.
-
-Données de la partie (JSON) :
-{game_data}
+- Ton conseil doit coller au champion ou au matchup (assassin vs mage, control mage vs roamer…).
