@@ -86,10 +86,13 @@ fn assert_well_formed(result: &AnalysisResult) -> String {
         "rating must be the first word, got summary: {}",
         result.summary
     );
+    // The prompt contract asks for 150-250 words; LLM compliance is
+    // approximate, so leave headroom while still catching a regression to
+    // terse 3-sentence answers or runaway rambling.
     let words = result.summary.split_whitespace().count();
     assert!(
-        (80..=400).contains(&words),
-        "expected 80-400 words, got {words}: {}",
+        (120..=320).contains(&words),
+        "expected 120-320 words, got {words}: {}",
         result.summary
     );
     rating
