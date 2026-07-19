@@ -116,6 +116,8 @@ mod match_result {
             enemy_damage: Some(22000),
             queue_id: None,
             role_gaps: None,
+            game_end_timestamp: None,
+            game_start_timestamp: None,
         };
         assert_eq!(result.match_id, "EUW1_12345");
         assert!(result.win);
@@ -145,6 +147,8 @@ mod match_result {
             enemy_damage: Some(24000),
             queue_id: None,
             role_gaps: None,
+            game_end_timestamp: None,
+            game_start_timestamp: None,
         };
         assert!(!result.win);
     }
@@ -172,6 +176,8 @@ mod match_result {
             enemy_damage: None,
             queue_id: None,
             role_gaps: None,
+            game_end_timestamp: None,
+            game_start_timestamp: None,
         };
         let cloned = result.clone();
         assert_eq!(result.match_id, cloned.match_id);
@@ -201,6 +207,8 @@ mod match_result {
             enemy_damage: None,
             queue_id: None,
             role_gaps: None,
+            game_end_timestamp: None,
+            game_start_timestamp: None,
         };
         assert_eq!(result.kills, 0);
         assert_eq!(result.deaths, 0);

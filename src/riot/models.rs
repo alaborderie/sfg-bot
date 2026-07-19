@@ -44,6 +44,12 @@ pub struct MatchResult {
     /// perspective (e.g. `"Bot gap (-5.8k), Top diff (+4.1k)"`). `None` when
     /// no lane crosses the gap threshold.
     pub role_gaps: Option<String>,
+    /// Unix timestamp (milliseconds) when the match ended on the game server.
+    /// Available from match-v5 since patch 11.20.
+    pub game_end_timestamp: Option<i64>,
+    /// Unix timestamp (milliseconds) when the match started on the game server.
+    /// Available from match-v5 since patch 11.20.
+    pub game_start_timestamp: Option<i64>,
 }
 
 /// Represents a change in game state for a summoner
