@@ -258,9 +258,22 @@ pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult)
         embed = embed.field("🎯 Écarts par rôle", gaps.to_string(), false);
     }
 
+    let timestamp = match_result
+        .game_end_timestamp
+        .and_then(|millis| Timestamp::from_millis(millis).ok())
+        .or_else(|| {
+            let start = match_result.game_start_timestamp?;
+            let duration_ms = (match_result.game_duration_secs as i64) * 1000;
+            Timestamp::from_millis(start + duration_ms).ok()
+        });
+
+    embed = embed.footer(CreateEmbedFooter::new(footer_text));
+
+    if let Some(ts) = timestamp {
+        embed = embed.timestamp(ts);
+    }
+
     embed
-        .footer(CreateEmbedFooter::new(footer_text))
-        .timestamp(Timestamp::now())
 }
 
 fn format_list(items: &[String]) -> String {

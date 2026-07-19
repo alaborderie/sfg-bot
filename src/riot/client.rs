@@ -244,6 +244,8 @@ impl RiotApiClient for RiotClient {
                 enemy_damage,
                 queue_id,
                 role_gaps,
+                game_end_timestamp: m.info.game_end_timestamp,
+                game_start_timestamp: Some(m.info.game_start_timestamp),
             })
         }))
     }
