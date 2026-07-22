@@ -199,7 +199,7 @@ impl Repository for PgRepository {
             r#"
             INSERT INTO active_games (summoner_id, game_id, champion_id, game_mode, game_start_time, queue_id)
             VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING id, summoner_id, game_id, champion_id, game_mode, game_start_time, queue_id, created_at
+            RETURNING *
             "#,
         )
         .bind(game.summoner_id)
