@@ -8,10 +8,11 @@ use crate::db::repository::Repository;
 use crate::discord::commands;
 use crate::discord::messages::format_mention_response;
 use crate::notification::NotificationProcessor;
+use crate::notification::messages::format_report_unavailable;
 use crate::riot::client::RiotApiClient;
 use crate::riot::client::RiotClient;
-use crate::riot::models::GameStateChange;
-use crate::riot::tracker::GameTracker;
+use crate::riot::models::{GameStateChange, MatchLookup};
+use crate::riot::tracker::{GameTracker, MAX_END_RETRY_CYCLES};
 use serenity::async_trait;
 use serenity::builder::CreateMessage;
 use serenity::model::application::Interaction;
@@ -340,7 +341,8 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
             let tracker_result = tracker.handle_game_ended(summoner, game_id).await;
 
             match tracker_result {
-                Ok(Some(match_result)) => {
+                Ok(MatchLookup::Found(match_result)) => {
+                    let match_result = *match_result;
                     let champion_name = tracker
                         .repository
                         .get_champion_by_id(match_result.champion_id)
@@ -385,13 +387,25 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
                         analysis_pipeline.clone(),
                     );
                 }
-                Ok(None) => {
-                    tracing::warn!(
-                        "Could not get match result for {}#{} game {}",
+                Ok(MatchLookup::Pending { attempts }) => {
+                    tracing::info!(
+                        "Match data for {}#{} game {} not yet available (cycle {}/{}); will retry next poll",
                         summoner_clone.game_name,
                         summoner_clone.tag_line,
-                        game_id
+                        game_id,
+                        attempts,
+                        MAX_END_RETRY_CYCLES
                     );
+                }
+                Ok(MatchLookup::GaveUp { attempts }) => {
+                    tracing::warn!(
+                        "Giving up on match data for {}#{} game {} after {} cycles",
+                        summoner_clone.game_name,
+                        summoner_clone.tag_line,
+                        game_id,
+                        attempts
+                    );
+                    send_report_unavailable(ctx, tracker, &summoner_clone, game_id).await;
                 }
                 Err(e) => {
                     tracing::error!(
@@ -415,7 +429,8 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
             let tracker_result = tracker.handle_game_ended(summoner, game_id).await;
 
             match tracker_result {
-                Ok(Some(match_result)) => {
+                Ok(MatchLookup::Found(match_result)) => {
+                    let match_result = *match_result;
                     let champion_name = tracker
                         .repository
                         .get_champion_by_id(match_result.champion_id)
@@ -460,13 +475,23 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
                         analysis_pipeline.clone(),
                     );
                 }
-                Ok(None) => {
-                    tracing::warn!(
-                        "Could not get match result for {}#{} game {}",
+                Ok(MatchLookup::Pending { .. }) => {
+                    tracing::info!(
+                        "Match data for {}#{} featured game {} not yet available; will retry next poll",
                         summoner_clone.game_name,
                         summoner_clone.tag_line,
                         game_id
                     );
+                }
+                Ok(MatchLookup::GaveUp { attempts }) => {
+                    tracing::warn!(
+                        "Giving up on match data for {}#{} featured game {} after {} cycles",
+                        summoner_clone.game_name,
+                        summoner_clone.tag_line,
+                        game_id,
+                        attempts
+                    );
+                    send_report_unavailable(ctx, tracker, &summoner_clone, game_id).await;
                 }
                 Err(e) => {
                     tracing::error!(
@@ -482,6 +507,42 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
     }
 
     Ok(())
+}
+
+/// Tells the notification channel that a game's recap will never arrive.
+/// Best-effort: a failure here is only logged, the game is already dropped.
+async fn send_report_unavailable<R: RiotApiClient + ?Sized, D: Repository + ?Sized>(
+    ctx: &Context,
+    tracker: &GameTracker<R, D>,
+    summoner: &Summoner,
+    game_id: i64,
+) {
+    let channel_id = match tracker.repository.get_all_bot_configs().await {
+        Ok(configs) => match configs.first() {
+            Some(c) => ChannelId::new(c.channel_id as u64),
+            None => return,
+        },
+        Err(e) => {
+            tracing::error!(
+                "Failed to fetch bot config for report-unavailable notice: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    let summoner_name = format!("{}#{}", summoner.game_name, summoner.tag_line);
+    let embed = format_report_unavailable(&summoner_name, game_id);
+    if let Err(error) = channel_id
+        .send_message(&ctx.http, CreateMessage::new().embed(embed))
+        .await
+    {
+        tracing::error!(
+            summoner = summoner_name.as_str(),
+            error = %error,
+            "Failed to send report-unavailable notice"
+        );
+    }
 }
 
 fn spawn_analysis_task<R: RiotApiClient + ?Sized + 'static, D: Repository + ?Sized + 'static>(

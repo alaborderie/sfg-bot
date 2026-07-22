@@ -1,10 +1,14 @@
 use crate::db::models::{NewActiveGame, NewMatchResult, Summoner};
 use crate::db::repository::{Repository, RepositoryError};
 use crate::riot::client::{RiotApiClient, RiotClient, RiotClientError};
-use crate::riot::models::{ActiveGameInfo, GameStateChange, MatchResult};
+use crate::riot::models::{ActiveGameInfo, GameStateChange, MatchLookup, MatchResult};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
+
+/// How many poll cycles a finished game may fail its match lookup before
+/// the tracker gives up and drops it.
+pub const MAX_END_RETRY_CYCLES: i32 = 5;
 
 #[derive(Debug, Error)]
 pub enum TrackerError {
@@ -109,22 +113,37 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
         Ok(())
     }
 
-    /// Handle game ended: delete from active_games, try to fetch match result
+    /// Handle game ended: fetch the match result, then resolve the active
+    /// game. The active_games row is only deleted once the lookup succeeds
+    /// (or the retry budget is exhausted), so a failed lookup is retried on
+    /// the next poll cycle instead of losing the game.
     pub async fn handle_game_ended(
         &self,
         summoner: &Summoner,
         game_id: i64,
-    ) -> Result<Option<MatchResult>, TrackerError> {
-        // Delete from active games
-        self.repository
-            .delete_active_game_by_summoner_and_game(summoner.id, game_id)
-            .await?;
+    ) -> Result<MatchLookup, TrackerError> {
+        let result = self.fetch_match_with_retry(summoner, game_id, 6).await;
 
-        // Try to fetch match result with retries
-        let result = self.fetch_match_with_retry(summoner, game_id, 6).await?;
+        let Some(match_result) = result else {
+            let attempts = self
+                .repository
+                .increment_active_game_end_retry(summoner.id, game_id)
+                .await?;
+            return Ok(match attempts {
+                Some(attempts) if attempts >= MAX_END_RETRY_CYCLES => {
+                    self.repository
+                        .delete_active_game_by_summoner_and_game(summoner.id, game_id)
+                        .await?;
+                    MatchLookup::GaveUp { attempts }
+                }
+                Some(attempts) => MatchLookup::Pending { attempts },
+                // No active_games row: featured-mode fallback, which already
+                // re-fires on every poll until the match shows up in history.
+                None => MatchLookup::Pending { attempts: 0 },
+            });
+        };
 
-        // If we got a result, save it to match_history
-        if let Some(ref match_result) = result {
+        {
             let new_match = NewMatchResult {
                 summoner_id: summoner.id,
                 match_id: match_result.match_id.clone(),
@@ -152,7 +171,11 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
             let _ = self.repository.insert_match_result(&new_match).await;
         }
 
-        Ok(result)
+        self.repository
+            .delete_active_game_by_summoner_and_game(summoner.id, game_id)
+            .await?;
+
+        Ok(MatchLookup::Found(Box::new(match_result)))
     }
 
     /// Fetch match result with retries (match data appears delayed)
@@ -161,7 +184,7 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
         summoner: &Summoner,
         game_id: i64,
         max_retries: u32,
-    ) -> Result<Option<MatchResult>, TrackerError> {
+    ) -> Option<MatchResult> {
         let region = RiotClient::regional_for_region(&self.default_region);
         let platform = RiotClient::platform_for_region(&self.default_region);
         let match_id = format!("{}_{}", platform, game_id);
@@ -182,15 +205,26 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
             match self
                 .riot_client
                 .get_match_result(&match_id, &summoner.riot_puuid, region)
-                .await?
+                .await
             {
-                Some(result) => return Ok(Some(result)),
-                None => {
+                Ok(Some(result)) => return Some(result),
+                Ok(None) => {
                     tracing::debug!(
                         "Match {} not yet available (attempt {}/{})",
                         match_id,
                         attempt + 1,
                         max_retries
+                    );
+                }
+                // Rate limits and transient Riot failures must not abort the
+                // lookup — the caller decides when to give up, across cycles.
+                Err(error) => {
+                    tracing::warn!(
+                        "Match {} lookup failed (attempt {}/{}): {}",
+                        match_id,
+                        attempt + 1,
+                        max_retries,
+                        error
                     );
                 }
             }
@@ -201,7 +235,7 @@ impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
             match_id,
             max_retries
         );
-        Ok(None)
+        None
     }
 
     async fn check_featured_mode_game_end(

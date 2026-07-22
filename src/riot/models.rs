@@ -52,6 +52,19 @@ pub struct MatchResult {
     pub game_start_timestamp: Option<i64>,
 }
 
+/// Outcome of the match lookup performed when a game ends
+#[derive(Debug, Clone)]
+pub enum MatchLookup {
+    /// Match data retrieved; the game is fully resolved. Boxed to keep the
+    /// enum small next to the unit-like retry variants.
+    Found(Box<MatchResult>),
+    /// Match data not available yet; the active game is kept so the next
+    /// poll cycle retries the lookup
+    Pending { attempts: i32 },
+    /// Retry budget exhausted; the active game was dropped
+    GaveUp { attempts: i32 },
+}
+
 /// Represents a change in game state for a summoner
 #[derive(Debug, Clone)]
 pub enum GameStateChange {

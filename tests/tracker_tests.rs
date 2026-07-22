@@ -8,8 +8,8 @@ use mockall::predicate::*;
 use riven::consts::{PlatformRoute, RegionalRoute};
 use sfg_bot::db::models::{ActiveGame, MatchHistory, NewActiveGame, Summoner};
 use sfg_bot::riot::client::RiotClientError;
-use sfg_bot::riot::models::{ActiveGameInfo, GameStateChange, MatchResult};
-use sfg_bot::riot::tracker::GameTracker;
+use sfg_bot::riot::models::{ActiveGameInfo, GameStateChange, MatchLookup, MatchResult};
+use sfg_bot::riot::tracker::{GameTracker, MAX_END_RETRY_CYCLES};
 use sfg_bot::{MockRepository, MockRiotApiClient, RepositoryError};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -46,6 +46,7 @@ fn create_test_active_game(summoner_id: Uuid, game_id: i64) -> ActiveGame {
         game_start_time: Utc::now(),
         created_at: Utc::now(),
         queue_id: None,
+        end_retry_count: 0,
     }
 }
 
@@ -383,6 +384,7 @@ mod handle_game_started {
                     game_start_time: new_game.game_start_time,
                     created_at: Utc::now(),
                     queue_id: new_game.queue_id,
+                    end_retry_count: 0,
                 })
             });
 
@@ -447,14 +449,15 @@ mod handle_game_ended {
 
         let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 
-        assert!(result.is_some());
-        let match_result = result.unwrap();
+        let MatchLookup::Found(match_result) = result else {
+            panic!("expected MatchLookup::Found, got {result:?}");
+        };
         assert_eq!(match_result.game_id, 12345);
         assert!(match_result.win);
     }
 
     #[tokio::test]
-    async fn returns_none_when_match_not_found() {
+    async fn keeps_active_game_pending_when_match_not_found() {
         tokio::time::pause();
 
         let summoner = create_test_summoner();
@@ -467,7 +470,41 @@ mod handle_game_ended {
             .times(6)
             .returning(|_, _, _| Ok(None));
 
+        // No delete expectation: the active game must survive for the next
+        // poll cycle to retry.
         let mut mock_repo = MockRepository::new();
+        mock_repo
+            .expect_increment_active_game_end_retry()
+            .with(eq(summoner.id), eq(game_id))
+            .times(1)
+            .returning(|_, _| Ok(Some(1)));
+
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
+
+        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
+
+        assert!(matches!(result, MatchLookup::Pending { attempts: 1 }));
+    }
+
+    #[tokio::test]
+    async fn gives_up_and_deletes_after_max_retry_cycles() {
+        tokio::time::pause();
+
+        let summoner = create_test_summoner();
+        let game_id = 12345i64;
+
+        let mut mock_riot = MockRiotApiClient::new();
+        mock_riot
+            .expect_get_match_result()
+            .times(6)
+            .returning(|_, _, _| Ok(None));
+
+        let mut mock_repo = MockRepository::new();
+        mock_repo
+            .expect_increment_active_game_end_retry()
+            .with(eq(summoner.id), eq(game_id))
+            .times(1)
+            .returning(|_, _| Ok(Some(MAX_END_RETRY_CYCLES)));
         mock_repo
             .expect_delete_active_game_by_summoner_and_game()
             .with(eq(summoner.id), eq(game_id))
@@ -478,7 +515,78 @@ mod handle_game_ended {
 
         let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 
-        assert!(result.is_none());
+        assert!(matches!(
+            result,
+            MatchLookup::GaveUp {
+                attempts: MAX_END_RETRY_CYCLES
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn stays_pending_without_active_game_row() {
+        tokio::time::pause();
+
+        let summoner = create_test_summoner();
+        let game_id = 12345i64;
+
+        let mut mock_riot = MockRiotApiClient::new();
+        mock_riot
+            .expect_get_match_result()
+            .times(6)
+            .returning(|_, _, _| Ok(None));
+
+        // Featured-mode fallback: no active_games row to increment.
+        let mut mock_repo = MockRepository::new();
+        mock_repo
+            .expect_increment_active_game_end_retry()
+            .times(1)
+            .returning(|_, _| Ok(None));
+
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
+
+        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
+
+        assert!(matches!(result, MatchLookup::Pending { attempts: 0 }));
+    }
+
+    #[tokio::test]
+    async fn retries_through_riot_errors() {
+        tokio::time::pause();
+
+        let summoner = create_test_summoner();
+        let game_id = 12345i64;
+
+        // A rate-limited attempt must not abort the lookup: two errors,
+        // then the match shows up.
+        let mut mock_riot = MockRiotApiClient::new();
+        mock_riot
+            .expect_get_match_result()
+            .times(2)
+            .returning(|_, _, _| Err(RiotClientError::UnknownRegion("test".to_string())));
+        mock_riot
+            .expect_get_match_result()
+            .times(1)
+            .returning(move |_, _, _| Ok(Some(create_test_match_result(12345))));
+
+        let summoner_id = summoner.id;
+        let mut mock_repo = MockRepository::new();
+        mock_repo
+            .expect_delete_active_game_by_summoner_and_game()
+            .times(1)
+            .returning(|_, _| Ok(()));
+        mock_repo
+            .expect_insert_match_result()
+            .times(1)
+            .returning(move |new_match| {
+                Ok(create_test_match_history(summoner_id, new_match.game_id))
+            });
+
+        let tracker = GameTracker::new(Arc::new(mock_riot), Arc::new(mock_repo), "na1".to_string());
+
+        let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
+
+        assert!(matches!(result, MatchLookup::Found(_)));
     }
 
     #[tokio::test]
@@ -486,9 +594,20 @@ mod handle_game_ended {
         let summoner = create_test_summoner();
         let game_id = 12345i64;
 
-        let mock_riot = MockRiotApiClient::new();
+        let mut mock_riot = MockRiotApiClient::new();
+        mock_riot
+            .expect_get_match_result()
+            .times(1)
+            .returning(move |_, _, _| Ok(Some(create_test_match_result(12345))));
 
+        let summoner_id = summoner.id;
         let mut mock_repo = MockRepository::new();
+        mock_repo
+            .expect_insert_match_result()
+            .times(1)
+            .returning(move |new_match| {
+                Ok(create_test_match_history(summoner_id, new_match.game_id))
+            });
         mock_repo
             .expect_delete_active_game_by_summoner_and_game()
             .times(1)
@@ -527,6 +646,6 @@ mod handle_game_ended {
 
         let result = tracker.handle_game_ended(&summoner, game_id).await.unwrap();
 
-        assert!(result.is_some());
+        assert!(matches!(result, MatchLookup::Found(_)));
     }
 }

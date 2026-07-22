@@ -50,6 +50,15 @@ pub trait Repository: Send + Sync {
         game_id: i64,
     ) -> Result<(), RepositoryError>;
 
+    /// Bumps the failed-lookup counter for a finished game and returns the
+    /// new count, or `None` when no active_games row matches (featured-mode
+    /// fallback has no row).
+    async fn increment_active_game_end_retry(
+        &self,
+        summoner_id: Uuid,
+        game_id: i64,
+    ) -> Result<Option<i32>, RepositoryError>;
+
     async fn insert_match_result(
         &self,
         result: &NewMatchResult,
@@ -250,6 +259,26 @@ impl Repository for PgRepository {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    async fn increment_active_game_end_retry(
+        &self,
+        summoner_id: Uuid,
+        game_id: i64,
+    ) -> Result<Option<i32>, RepositoryError> {
+        let count = sqlx::query_scalar::<_, i32>(
+            r#"
+            UPDATE active_games
+            SET end_retry_count = end_retry_count + 1
+            WHERE summoner_id = $1 AND game_id = $2
+            RETURNING end_retry_count
+            "#,
+        )
+        .bind(summoner_id)
+        .bind(game_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(count)
     }
 
     async fn insert_match_result(

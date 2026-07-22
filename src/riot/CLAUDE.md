@@ -47,5 +47,7 @@ The trait uses `#[async_trait]` and `#[automock]` (behind `test-mocks` feature).
   - `GameEnded` — previously tracked game no longer active, fetches match result, inserts `match_history` + `notification_events`
   - `FeaturedModeGameEnded` — game ended but no match data found (featured/spectator mode)
   - `NoChange` — no state transition
-- Includes retry logic for match data fetching (Riot API can delay match availability)
+- Includes retry logic for match data fetching (Riot API can delay match availability), in two layers:
+  - In-line: `fetch_match_with_retry` tries 6× with 10s waits; Riot API errors (e.g. 429) count as "not yet available" instead of aborting
+  - Cross-cycle: `handle_game_ended` returns `MatchLookup::{Found, Pending, GaveUp}` and only deletes the `active_games` row on `Found` — a failed lookup re-fires `GameEnded` on the next poll, tracked via `active_games.end_retry_count`, until `MAX_END_RETRY_CYCLES` (then `GaveUp` → the handler posts a "Récap indisponible" embed)
 - Generic over `R: RiotApiClient` and `D: Repository` for testability

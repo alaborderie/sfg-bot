@@ -22,6 +22,7 @@ pub struct ActiveGame {
     pub game_mode: String,
     pub game_start_time: DateTime<Utc>,
     pub queue_id: Option<i32>,
+    pub end_retry_count: i32,
     pub created_at: DateTime<Utc>,
 }
 

@@ -192,6 +192,21 @@ fn pick_role_gaps(events: &[NotificationEvent]) -> Option<String> {
         .cloned()
 }
 
+/// Posted when a finished game exhausted its match-lookup retry budget:
+/// the recap and analysis will never arrive, so say it instead of staying
+/// silent.
+pub fn format_report_unavailable(summoner_name: &str, game_id: i64) -> CreateEmbed {
+    CreateEmbed::new()
+        .title("⚠️ Récap indisponible")
+        .description(format!(
+            "Impossible de récupérer les données de la partie `{game_id}` de **{summoner_name}** \
+             auprès de l'API Riot (données indisponibles ou API saturée). \
+             Pas de récap ni d'analyse pour cette partie."
+        ))
+        .colour(Colour::from_rgb(230, 126, 34))
+        .timestamp(Timestamp::now())
+}
+
 pub fn format_single_game_ended(summoner_name: &str, match_result: &MatchResult) -> CreateEmbed {
     let color = if match_result.win {
         Colour::from_rgb(46, 204, 113)
