@@ -79,8 +79,13 @@ pub struct RiotClient {
 
 impl RiotClient {
     pub fn new(api_key: &str) -> Self {
+        // No internal retries: a 429'd poll retried 3× just quadruples the
+        // rejected traffic during a rate-limit storm. Polling comes back on
+        // its own next cycle, and match lookups have their own retry loop
+        // (in-line + cross-cycle) in the tracker.
+        let config = riven::RiotApiConfig::with_key(api_key).set_retries(0);
         Self {
-            api: RiotApi::new(api_key),
+            api: RiotApi::new(config),
         }
     }
 
