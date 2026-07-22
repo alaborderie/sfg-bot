@@ -678,6 +678,19 @@ pub async fn run(
         }
     };
 
+    if !crate::analysis::is_analyzable_mode(&analysis_data.game_mode) {
+        let _ = command
+            .create_followup(
+                &ctx.http,
+                CreateInteractionResponseFollowup::new().content(
+                    "🎪 Pas d'analyse pour ce mode de jeu (Arena) : le coach ne gère que \
+                     les modes classiques avec lanes et rôles.",
+                ),
+            )
+            .await;
+        return;
+    }
+
     let result = crate::analysis::history::analyze_with_memory(
         repository.as_ref(),
         pipeline,

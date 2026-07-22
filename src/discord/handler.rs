@@ -343,6 +343,7 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
             match tracker_result {
                 Ok(MatchLookup::Found(match_result)) => {
                     let match_result = *match_result;
+                    let analyzable = crate::analysis::is_analyzable_mode(&match_result.game_mode);
                     let champion_name = tracker
                         .repository
                         .get_champion_by_id(match_result.champion_id)
@@ -379,13 +380,22 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
 
                     tracker.repository.insert_notification_event(&event).await?;
 
-                    spawn_analysis_task(
-                        ctx,
-                        tracker,
-                        &summoner_clone,
-                        &match_id,
-                        analysis_pipeline.clone(),
-                    );
+                    if analyzable {
+                        spawn_analysis_task(
+                            ctx,
+                            tracker,
+                            &summoner_clone,
+                            &match_id,
+                            analysis_pipeline.clone(),
+                        );
+                    } else {
+                        tracing::info!(
+                            "Skipping analysis for {}#{} match {}: game mode not analyzable",
+                            summoner_clone.game_name,
+                            summoner_clone.tag_line,
+                            match_id
+                        );
+                    }
                 }
                 Ok(MatchLookup::Pending { attempts }) => {
                     tracing::info!(
@@ -431,6 +441,7 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
             match tracker_result {
                 Ok(MatchLookup::Found(match_result)) => {
                     let match_result = *match_result;
+                    let analyzable = crate::analysis::is_analyzable_mode(&match_result.game_mode);
                     let champion_name = tracker
                         .repository
                         .get_champion_by_id(match_result.champion_id)
@@ -467,13 +478,22 @@ async fn check_and_notify<R: RiotApiClient + ?Sized + 'static, D: Repository + ?
 
                     tracker.repository.insert_notification_event(&event).await?;
 
-                    spawn_analysis_task(
-                        ctx,
-                        tracker,
-                        &summoner_clone,
-                        &match_id,
-                        analysis_pipeline.clone(),
-                    );
+                    if analyzable {
+                        spawn_analysis_task(
+                            ctx,
+                            tracker,
+                            &summoner_clone,
+                            &match_id,
+                            analysis_pipeline.clone(),
+                        );
+                    } else {
+                        tracing::info!(
+                            "Skipping analysis for {}#{} match {}: game mode not analyzable",
+                            summoner_clone.game_name,
+                            summoner_clone.tag_line,
+                            match_id
+                        );
+                    }
                 }
                 Ok(MatchLookup::Pending { .. }) => {
                     tracing::info!(
