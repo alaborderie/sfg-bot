@@ -24,6 +24,9 @@ pub struct GameTracker<R: RiotApiClient + ?Sized, D: Repository + ?Sized> {
     default_region: String,
 }
 
+// Match RiotApiClient's existing allowance: the upstream riven error is ~200
+// bytes. Preserve the public TrackerError shape when Clippy checks async results.
+#[allow(clippy::result_large_err)]
 impl<R: RiotApiClient + ?Sized, D: Repository + ?Sized> GameTracker<R, D> {
     pub fn new(riot_client: Arc<R>, repository: Arc<D>, default_region: String) -> Self {
         Self {
