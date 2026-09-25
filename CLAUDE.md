@@ -1,6 +1,6 @@
 # sfg-bot
 
-Discord bot that tracks SouthFoxGaming League of Legends games — detects game start/end, posts notifications to a Discord channel, and optionally runs AI post-game analysis via a self-hosted LLM (Gemma 4 behind an OpenAI-compatible API).
+Discord bot that tracks SouthFoxGaming League of Legends games — detects game start/end, posts notifications to a Discord channel, and optionally runs AI post-game analysis via a hosted LLM (DeepSeek V4.1 Flash through the OpenCode Go OpenAI-compatible API).
 
 ## Tech Stack
 
@@ -23,7 +23,7 @@ Discord bot that tracks SouthFoxGaming League of Legends games — detects game 
 3. **State machine** — `GameTracker` detects `GameStarted`, `GameEnded`, `FeaturedModeGameEnded`, `NoChange`
 4. **Event queue** — State changes insert `NotificationEvent` rows into PostgreSQL
 5. **Notification processor** — Polls pending events, groups by game_id/match_id, waits 30s to batch multi-player notifications, sends Discord embeds
-6. **AI analysis** (optional) — On game end, if `LLM_API_KEY` is set, fetches match timeline + stats, sends to the LLM (Gemma 4) for French-language analysis
+6. **AI analysis** (optional) — On game end, if `LLM_API_KEY` is set, fetches match timeline + stats, sends to the LLM (DeepSeek V4.1 Flash) for French-language analysis
 
 ### Key Patterns
 
@@ -85,9 +85,9 @@ All config via environment variables (see `.env.example`):
 | `RIOT_API_KEY` | Yes | Riot Games API key |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `POLLING_INTERVAL_SECS` | No | Polling frequency (default in config) |
-| `LLM_API_KEY` | No | Enables AI analysis (key for the OpenAI-compatible LLM server; any non-empty value if the server does not check auth) |
-| `LLM_BASE_URL` | No | Base URL of the OpenAI-compatible LLM server (default: `http://jarvis:8080/v1`) |
-| `LLM_MODEL` | No | Model name/alias requested from the LLM server (default: `gemma-4-26b`) |
+| `LLM_API_KEY` | No | Enables AI analysis (OpenCode Go API key for the OpenAI-compatible LLM API) |
+| `LLM_BASE_URL` | No | Base URL of the OpenAI-compatible LLM API (default: `https://opencode.ai/zen/go/v1`) |
+| `LLM_MODEL` | No | Model name requested from the LLM API (default: `deepseek-v4.1-flash`) |
 | `ANALYSIS_PROMPTS_DIR` | No | Directory with role-specific prompts (default: `analysis_prompts`) |
 | `DEFAULT_REGION` | No | Riot API region routing |
 | `HEALTH_CHECK_PORT` | No | If set, bind a `0.0.0.0:port` HTTP/TCP listener that responds `200 OK` (for K8s readiness/liveness probes) |

@@ -1,24 +1,24 @@
-//! Live calibration tests against the real LLM server.
+//! Live calibration tests against the real LLM API.
 //!
-//! Ignored by default: they need the local LLM server running and each call
-//! can take minutes. Run explicitly with:
+//! Ignored by default: they need OpenCode Go credentials and each call can
+//! take minutes. Run explicitly with:
 //!
 //! ```sh
-//! cargo test --test live_llm_calibration -- --ignored --test-threads=1
+//! LLM_API_KEY=... cargo test --test live_llm_calibration -- --ignored --test-threads=1
 //! ```
 //!
-//! Environment overrides: `LLM_BASE_URL` (default `http://jarvis:8080/v1`),
-//! `LLM_MODEL` (default `gemma-4-26b`), `LLM_API_KEY` (default `test`).
+//! Environment overrides: `LLM_BASE_URL` (default `https://opencode.ai/zen/go/v1`),
+//! `LLM_MODEL` (default `deepseek-v4.1-flash`), `LLM_API_KEY` (required).
 
 use sfg_bot::analysis::llm::LlmClient;
 use sfg_bot::analysis::models::{AnalysisData, AnalysisResult, RecentGameSummary};
 use sfg_bot::analysis::pipeline::AnalysisPipeline;
 
 fn live_pipeline() -> AnalysisPipeline {
-    let base_url =
-        std::env::var("LLM_BASE_URL").unwrap_or_else(|_| "http://jarvis:8080/v1".to_string());
-    let model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "gemma-4-26b".to_string());
-    let api_key = std::env::var("LLM_API_KEY").unwrap_or_else(|_| "test".to_string());
+    let base_url = std::env::var("LLM_BASE_URL")
+        .unwrap_or_else(|_| "https://opencode.ai/zen/go/v1".to_string());
+    let model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "deepseek-v4.1-flash".to_string());
+    let api_key = std::env::var("LLM_API_KEY").expect("LLM_API_KEY must be set");
     let client = LlmClient::new(api_key, base_url, model).expect("build LLM client");
     AnalysisPipeline::new(client, "analysis_prompts").expect("load analysis prompts")
 }
