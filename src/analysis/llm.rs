@@ -18,6 +18,10 @@ pub struct LlmClient {
     api_key: String,
     model: String,
     base_url: String,
+    // OpenCode Go requires a stable `x-opencode-session` header per
+    // conversation (used for routing and prompt caching). One id per client
+    // instance keeps every analysis from this process on the same session.
+    session_id: String,
 }
 
 #[derive(Debug, Error)]
@@ -70,6 +74,9 @@ impl LlmClient {
     pub fn new(api_key: String, base_url: String, model: String) -> Result<Self, LlmError> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
+            // OpenCode Go asks clients to identify themselves instead of
+            // sending a generic SDK/HTTP-library user agent.
+            .user_agent(format!("sfg-bot/{}", env!("CARGO_PKG_VERSION")))
             .build()
             .map_err(LlmError::HttpError)?;
 
@@ -78,6 +85,7 @@ impl LlmClient {
             api_key,
             model,
             base_url,
+            session_id: uuid::Uuid::new_v4().to_string(),
         })
     }
 
@@ -105,6 +113,7 @@ impl LlmClient {
                 .client
                 .post(&url)
                 .header("Authorization", format!("Bearer {}", self.api_key))
+                .header("x-opencode-session", self.session_id.as_str())
                 .json(&request_body)
                 .send()
                 .await;

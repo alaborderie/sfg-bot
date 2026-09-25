@@ -32,6 +32,8 @@ AI-powered post-game analysis using a hosted LLM (DeepSeek V4.1 Flash) behind th
 - Model name sent in the request body comes from `LLM_MODEL` (default `deepseek-v4.1-flash`)
 - Retry logic: exponential backoff on 429 (rate limit) and 5xx errors
 - API key passed as `Authorization: Bearer` header
+- OpenCode Go requires a stable `x-opencode-session` header (a per-process UUID here) for routing/prompt caching — requests without it fail with `MissingSessionID`
+- Identifies itself with a `sfg-bot/<version>` User-Agent rather than the default reqwest one
 - DeepSeek V4.1 Flash is a reasoning model: it spends tokens on `reasoning_content` before the visible answer, so `MAX_TOKENS` is 8192 and the HTTP timeout is 300s; an empty `content` field is treated as `ParseError`
 - Temperature is 0.35: ratings must be stable across reruns of similar games
 
