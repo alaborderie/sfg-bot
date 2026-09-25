@@ -433,7 +433,7 @@ mod tests {
         LlmClient::new(
             "fake-key".to_string(),
             "http://localhost:8080/v1".to_string(),
-            "gemma-4-26b".to_string(),
+            "deepseek-v4.1-flash".to_string(),
         )
         .unwrap()
     }

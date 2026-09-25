@@ -47,9 +47,9 @@ impl Config {
             .unwrap_or(180);
 
         let llm_api_key = env::var("LLM_API_KEY").ok();
-        let llm_base_url =
-            env::var("LLM_BASE_URL").unwrap_or_else(|_| "http://jarvis:8080/v1".to_string());
-        let llm_model = env::var("LLM_MODEL").unwrap_or_else(|_| "gemma-4-26b".to_string());
+        let llm_base_url = env::var("LLM_BASE_URL")
+            .unwrap_or_else(|_| "https://opencode.ai/zen/go/v1".to_string());
+        let llm_model = env::var("LLM_MODEL").unwrap_or_else(|_| "deepseek-v4.1-flash".to_string());
         let analysis_prompts_dir =
             env::var("ANALYSIS_PROMPTS_DIR").unwrap_or_else(|_| "analysis_prompts".to_string());
         let health_check_port = env::var("HEALTH_CHECK_PORT")

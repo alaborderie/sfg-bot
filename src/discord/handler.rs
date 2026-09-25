@@ -682,7 +682,7 @@ mod tests {
             polling_interval_secs: 180,
             llm_api_key: None,
             llm_base_url: "http://localhost:8080/v1".to_string(),
-            llm_model: "gemma-4-26b".to_string(),
+            llm_model: "deepseek-v4.1-flash".to_string(),
             analysis_prompts_dir: "analysis_prompts".to_string(),
             health_check_port: None,
         }

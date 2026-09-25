@@ -6,10 +6,10 @@ use thiserror::Error;
 use tokio::time::sleep;
 
 const MAX_ATTEMPTS: usize = 3;
-// The local Gemma 4 server generates ~30 tokens/s and spends part of the
-// budget on reasoning tokens before the visible answer, so both the token
-// budget and the HTTP timeout are much larger than a hosted-API setup.
-const MAX_TOKENS: u32 = 4096;
+// DeepSeek V4.1 Flash is a reasoning model: it spends part of the token
+// budget on reasoning before emitting the visible answer, so the budget
+// leaves headroom for both. The timeout tolerates a long reasoning pass.
+const MAX_TOKENS: u32 = 8192;
 const REQUEST_TIMEOUT_SECS: u64 = 300;
 
 #[derive(Clone)]
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn llm_request_serializes_correctly() {
         let request = LlmRequest {
-            model: "gemma-4".to_string(),
+            model: "deepseek-v4.1-flash".to_string(),
             messages: vec![LlmMessage {
                 role: LlmRole::User,
                 content: "Hello".to_string(),
@@ -262,7 +262,7 @@ mod tests {
         };
 
         let value = serde_json::to_value(&request).expect("serialize request");
-        assert_eq!(value.get("model").unwrap(), "gemma-4");
+        assert_eq!(value.get("model").unwrap(), "deepseek-v4.1-flash");
         let temperature = value
             .get("temperature")
             .and_then(serde_json::Value::as_f64)

@@ -1,6 +1,6 @@
 # analysis/
 
-AI-powered post-game analysis using a self-hosted LLM (Gemma 4) behind an OpenAI-compatible API.
+AI-powered post-game analysis using a hosted LLM (DeepSeek V4.1 Flash) behind the OpenCode Go OpenAI-compatible API.
 
 ## Files
 
@@ -28,11 +28,11 @@ AI-powered post-game analysis using a self-hosted LLM (Gemma 4) behind an OpenAI
 ### LLM Client (llm.rs)
 
 - Uses `reqwest` for HTTP
-- Endpoint: `{LLM_BASE_URL}/chat/completions` (OpenAI-compatible; default base URL `http://jarvis:8080/v1`)
-- Model name sent in the request body comes from `LLM_MODEL` (default `gemma-4-26b` — the llama.cpp alias for the local Gemma 4 model)
+- Endpoint: `{LLM_BASE_URL}/chat/completions` (OpenAI-compatible; default base URL `https://opencode.ai/zen/go/v1`)
+- Model name sent in the request body comes from `LLM_MODEL` (default `deepseek-v4.1-flash`)
 - Retry logic: exponential backoff on 429 (rate limit) and 5xx errors
 - API key passed as `Authorization: Bearer` header
-- Gemma 4 is a reasoning model: it spends tokens on `reasoning_content` before the visible answer, so `MAX_TOKENS` is 4096 and the HTTP timeout is 300s (local generation runs ~30 tokens/s); an empty `content` field is treated as `ParseError`
+- DeepSeek V4.1 Flash is a reasoning model: it spends tokens on `reasoning_content` before the visible answer, so `MAX_TOKENS` is 8192 and the HTTP timeout is 300s; an empty `content` field is treated as `ParseError`
 - Temperature is 0.35: ratings must be stable across reruns of similar games
 
 ### Error Handling
@@ -62,7 +62,7 @@ AI-powered post-game analysis using a self-hosted LLM (Gemma 4) behind an OpenAI
 - `response_format.md` — output contract: French, rating as the literal first word (parser contract with `extract_overall_rating`), 150-250 words in 3 paragraphs ending with « Conseil de coach : » + one numeric goal.
 - Loaded by `load_shared_sections`; missing files are skipped with a warning (same robustness contract as skills).
 - The pipeline appends a final `## Données de la partie (JSON)` section carrying the `{game_data}` placeholder — prompt files must NOT contain `{game_data}` themselves.
-- Live calibration harness: `cargo test --test live_llm_calibration -- --ignored --test-threads=1` runs real scenarios against the local LLM server and asserts rating calibration (stomp-win is never Poor, disaster-loss is never Good, etc.).
+- Live calibration harness: `cargo test --test live_llm_calibration -- --ignored --test-threads=1` runs real scenarios against the OpenCode Go LLM API (needs `LLM_API_KEY`) and asserts rating calibration (stomp-win is never Poor, disaster-loss is never Good, etc.).
 
 ### Game memory (history.rs)
 
