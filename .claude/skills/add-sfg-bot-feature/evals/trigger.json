@@ -1,0 +1,26 @@
+[
+  {
+    "query": "Add a /leaderboard slash command to sfg-bot that shows the top summoners.",
+    "should_trigger": true
+  },
+  {
+    "query": "sfg-bot needs a new analysis prompt for the support role.",
+    "should_trigger": true
+  },
+  {
+    "query": "Add a migration to sfg-bot for a match_history table plus the model and repository methods.",
+    "should_trigger": true
+  },
+  {
+    "query": "Add a new slash command to my other Discord bot (not sfg-bot).",
+    "should_trigger": false
+  },
+  {
+    "query": "Why is sfg-bot crashlooping in the cluster right now?",
+    "should_trigger": false
+  },
+  {
+    "query": "Bump the riven dependency version in sfg-bot's Cargo.toml.",
+    "should_trigger": false
+  }
+]
