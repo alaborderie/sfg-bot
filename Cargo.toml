@@ -47,6 +47,12 @@ uuid = { version = "1", features = ["v4", "serde"] }
 # Async trait support
 async-trait = "0.1"
 
+# Verification control CLI (sfg-verify). Not used by the Discord bot binary.
+clap = { version = "4", features = ["derive", "env"] }
+# serenity 0.12's Http client is reqwest 0.12. The bot itself uses reqwest 0.13,
+# so the verify binary depends on 0.12 only to build a no_proxy() client.
+reqwest12 = { package = "reqwest", version = "0.12", default-features = false, features = ["rustls-tls"] }
+
 # Mocking (optional, for tests)
 mockall = { version = "0.13", optional = true }
 reqwest = { version = "0.13.1", features = ["json"] }

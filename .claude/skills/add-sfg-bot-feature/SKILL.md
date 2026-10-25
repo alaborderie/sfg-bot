@@ -28,7 +28,7 @@ This skill covers the four most common change shapes. Pick the section matching 
    - Add `pub async fn run_{name}(...)`. Existing handlers return `()` and answer Discord themselves — there is no `CommandError`. Signature shape, dropping any dependency the command does not use:
      ```rust
      pub async fn run_{name}(
-         ctx: &Context,
+         cache_http: &impl serenity::http::CacheHttp,
          command: &serenity::model::application::CommandInteraction,
          repository: &Arc<dyn Repository>,
          riot_client: &Arc<dyn RiotApiClient>,
@@ -36,7 +36,7 @@ This skill covers the four most common change shapes. Pick the section matching 
      )
      ```
    - Read arguments with `command.data.options()`, then `find_map` on `opt.name` and `ResolvedValue`. Match by option name.
-   - Fast commands call `command.create_response` with `CreateInteractionResponse::Message`. Commands that hit Riot or the LLM defer first (`CreateInteractionResponse::Defer`), then follow up — see `run` (`/analyze-last-game`). Errors are ephemeral French strings.
+   - The first parameter is `&impl CacheHttp` (the handler passes `&ctx`). Verification drives the same functions without a gateway shard. Fast commands call `command.create_response` with `CreateInteractionResponse::Message`. Commands that hit Riot or the LLM defer first (`CreateInteractionResponse::Defer`), then follow up — see `run` (`/analyze-last-game`). Errors are ephemeral French strings.
 3. Add a match arm in `Bot::interaction_create` in `src/discord/handler.rs` on `command.data.name`, passing the same `Arc`s the other arms pass.
 4. **User-facing strings are French.** Match the tone of the existing commands.
 5. If the command persists state, add a Repository method (see C below). SQL stays in `PgRepository`.

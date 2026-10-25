@@ -1,0 +1,32 @@
+{
+  "accounts": [
+    {
+      "game_name": "VerifyFox",
+      "tag_line": "SFG",
+      "puuid": "verify-puuid-sfg-bot-0001"
+    }
+  ],
+  "recent_match_id": "EUW1_9000000001",
+  "match": {
+    "match_id": "EUW1_9000000001",
+    "game_id": 9000000001,
+    "win": true,
+    "kills": 7,
+    "deaths": 2,
+    "assists": 11,
+    "champion_id": 157,
+    "champion_name": "Yasuo",
+    "game_duration_secs": 1842,
+    "game_mode": "CLASSIC",
+    "role": "MIDDLE",
+    "total_cs": 212,
+    "total_gold": 14220,
+    "total_damage": 24880,
+    "enemy_champion_name": "Ahri",
+    "enemy_cs": 188,
+    "enemy_gold": 12100,
+    "enemy_damage": 19340,
+    "queue_id": 420,
+    "role_gaps": null
+  }
+}
