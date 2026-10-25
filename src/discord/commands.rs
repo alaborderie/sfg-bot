@@ -7,9 +7,9 @@ use serenity::builder::{
     CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
 };
+use serenity::http::CacheHttp;
 use serenity::model::application::{CommandOptionType, ResolvedValue};
 use serenity::model::permissions::Permissions;
-use serenity::prelude::*;
 use std::sync::Arc;
 
 pub fn register_all() -> Vec<CreateCommand> {
@@ -71,14 +71,14 @@ fn register_remove_summoner() -> CreateCommand {
 }
 
 pub async fn run_init_sfg_bot(
-    ctx: &Context,
+    cache_http: &impl CacheHttp,
     command: &serenity::model::application::CommandInteraction,
     repository: &Arc<dyn Repository>,
 ) {
     let Some(guild_id) = command.guild_id else {
         let _ = command
             .create_response(
-                &ctx.http,
+                cache_http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("❌ Cette commande ne peut être utilisée que dans un serveur.")
@@ -95,9 +95,10 @@ pub async fn run_init_sfg_bot(
         Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::EMBED_LINKS;
 
     let permission_check = (|| {
-        let guild = ctx.cache.guild(guild_id)?;
+        let cache = cache_http.cache()?;
+        let guild = cache.guild(guild_id)?;
         let channel = guild.channels.get(&channel_id)?.clone();
-        let bot_id = ctx.cache.current_user().id;
+        let bot_id = cache.current_user().id;
         let member = guild.members.get(&bot_id)?.clone();
         Some(guild.user_permissions_in(&channel, &member))
     })();
@@ -117,7 +118,7 @@ pub async fn run_init_sfg_bot(
             }
             let _ = command
                 .create_response(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
                             .content(format!(
@@ -152,7 +153,7 @@ pub async fn run_init_sfg_bot(
             );
             let _ = command
                 .create_response(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new().content(format!(
                             "✅ Notifications configurées dans <#{}>. Les alertes de parties seront envoyées ici !",
@@ -166,7 +167,7 @@ pub async fn run_init_sfg_bot(
             tracing::error!(error = %e, "Failed to save bot config");
             let _ = command
                 .create_response(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
                             .content("❌ Erreur lors de la sauvegarde de la configuration.")
@@ -179,7 +180,7 @@ pub async fn run_init_sfg_bot(
 }
 
 pub async fn run_list_summoners(
-    ctx: &Context,
+    cache_http: &impl CacheHttp,
     command: &serenity::model::application::CommandInteraction,
     repository: &Arc<dyn Repository>,
 ) {
@@ -189,7 +190,7 @@ pub async fn run_list_summoners(
             tracing::error!(error = %e, "Failed to fetch summoners");
             let _ = command
                 .create_response(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
                             .content(
@@ -219,7 +220,7 @@ pub async fn run_list_summoners(
 
     let _ = command
         .create_response(
-            &ctx.http,
+            cache_http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new().content(content),
             ),
@@ -228,7 +229,7 @@ pub async fn run_list_summoners(
 }
 
 pub async fn run_add_summoner(
-    ctx: &Context,
+    cache_http: &impl CacheHttp,
     command: &serenity::model::application::CommandInteraction,
     repository: &Arc<dyn Repository>,
     riot_client: &Arc<dyn RiotApiClient>,
@@ -253,7 +254,7 @@ pub async fn run_add_summoner(
     if summoner_input.is_empty() {
         let _ = command
             .create_response(
-                &ctx.http,
+                cache_http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("❌ Merci de fournir un nom d'invocateur au format : `Nom#Tag`")
@@ -267,7 +268,7 @@ pub async fn run_add_summoner(
     let Some(hash_pos) = summoner_input.rfind('#') else {
         let _ = command
             .create_response(
-                &ctx.http,
+                cache_http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("❌ Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)")
@@ -284,7 +285,7 @@ pub async fn run_add_summoner(
     if game_name.is_empty() || tag_line.is_empty() {
         let _ = command
             .create_response(
-                &ctx.http,
+                cache_http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("❌ Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)")
@@ -296,7 +297,7 @@ pub async fn run_add_summoner(
     }
 
     let defer = CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new());
-    if let Err(e) = command.create_response(&ctx.http, defer).await {
+    if let Err(e) = command.create_response(cache_http, defer).await {
         tracing::error!("Failed to defer interaction: {}", e);
         return;
     }
@@ -316,7 +317,7 @@ pub async fn run_add_summoner(
             );
             let _ = command
                 .create_followup(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponseFollowup::new().content(format!(
                         "❌ Compte `{summoner_input}` introuvable. Vérifie le nom et le tag."
                     )),
@@ -343,7 +344,7 @@ pub async fn run_add_summoner(
             );
             let _ = command
                 .create_followup(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponseFollowup::new().content(format!(
                         "✅ **{}#{}** ajouté à la liste de suivi !",
                         summoner_info.game_name, summoner_info.tag_line
@@ -355,7 +356,7 @@ pub async fn run_add_summoner(
             tracing::error!(error = %e, "Failed to upsert summoner");
             let _ = command
                 .create_followup(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponseFollowup::new()
                         .content("❌ Erreur lors de l'ajout de l'invocateur."),
                 )
@@ -365,7 +366,7 @@ pub async fn run_add_summoner(
 }
 
 pub async fn run_remove_summoner(
-    ctx: &Context,
+    cache_http: &impl CacheHttp,
     command: &serenity::model::application::CommandInteraction,
     repository: &Arc<dyn Repository>,
 ) {
@@ -388,7 +389,7 @@ pub async fn run_remove_summoner(
     if summoner_input.is_empty() {
         let _ = command
             .create_response(
-                &ctx.http,
+                cache_http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("❌ Merci de fournir un nom d'invocateur au format : `Nom#Tag`")
@@ -402,7 +403,7 @@ pub async fn run_remove_summoner(
     let Some(hash_pos) = summoner_input.rfind('#') else {
         let _ = command
             .create_response(
-                &ctx.http,
+                cache_http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("❌ Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)")
@@ -419,7 +420,7 @@ pub async fn run_remove_summoner(
     if game_name.is_empty() || tag_line.is_empty() {
         let _ = command
             .create_response(
-                &ctx.http,
+                cache_http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("❌ Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)")
@@ -442,7 +443,7 @@ pub async fn run_remove_summoner(
             );
             let _ = command
                 .create_response(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new().content(format!(
                             "✅ **{game_name}#{tag_line}** retiré de la liste de suivi."
@@ -454,7 +455,7 @@ pub async fn run_remove_summoner(
         Ok(false) => {
             let _ = command
                 .create_response(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
                             .content(format!(
@@ -469,7 +470,7 @@ pub async fn run_remove_summoner(
             tracing::error!(error = %e, "Failed to delete summoner");
             let _ = command
                 .create_response(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
                             .content("❌ Erreur lors de la suppression de l'invocateur.")
@@ -482,7 +483,7 @@ pub async fn run_remove_summoner(
 }
 
 pub async fn run(
-    ctx: &Context,
+    cache_http: &impl CacheHttp,
     command: &serenity::model::application::CommandInteraction,
     riot_client: &Arc<dyn RiotApiClient>,
     repository: &Arc<dyn Repository>,
@@ -490,7 +491,7 @@ pub async fn run(
     default_region: &str,
 ) {
     let defer = CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new());
-    if let Err(e) = command.create_response(&ctx.http, defer).await {
+    if let Err(e) = command.create_response(cache_http, defer).await {
         tracing::error!("Failed to defer interaction: {}", e);
         return;
     }
@@ -513,7 +514,7 @@ pub async fn run(
 
     if summoner_input.is_empty() {
         send_error_followup(
-            ctx,
+            cache_http,
             command,
             "Merci de fournir un nom d'invocateur au format : `Nom#Tag`",
         )
@@ -523,7 +524,7 @@ pub async fn run(
 
     let Some(hash_pos) = summoner_input.rfind('#') else {
         send_error_followup(
-            ctx,
+            cache_http,
             command,
             "Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)",
         )
@@ -536,7 +537,7 @@ pub async fn run(
 
     if game_name.is_empty() || tag_line.is_empty() {
         send_error_followup(
-            ctx,
+            cache_http,
             command,
             "Format invalide. Utilise `Nom#Tag` (ex: `Doublelift#NA1`)",
         )
@@ -558,7 +559,7 @@ pub async fn run(
                 "Failed to resolve summoner account"
             );
             send_error_followup(
-                ctx,
+                cache_http,
                 command,
                 &format!("Compte `{summoner_input}` introuvable. Vérifie le nom et le tag."),
             )
@@ -574,7 +575,7 @@ pub async fn run(
         Ok(Some(id)) => id,
         Ok(None) => {
             send_error_followup(
-                ctx,
+                cache_http,
                 command,
                 &format!("Aucune partie récente trouvée pour `{summoner_input}`."),
             )
@@ -588,7 +589,7 @@ pub async fn run(
                 "Failed to fetch recent match ID"
             );
             send_error_followup(
-                ctx,
+                cache_http,
                 command,
                 "Impossible de récupérer les données de la dernière partie depuis l'API Riot.",
             )
@@ -604,7 +605,7 @@ pub async fn run(
         Ok(Some(result)) => result,
         Ok(None) => {
             send_error_followup(
-                ctx,
+                cache_http,
                 command,
                 "Impossible de récupérer les détails de la partie.",
             )
@@ -619,7 +620,7 @@ pub async fn run(
                 "Failed to fetch match result"
             );
             send_error_followup(
-                ctx,
+                cache_http,
                 command,
                 "Impossible de récupérer les détails de la partie depuis l'API Riot.",
             )
@@ -633,7 +634,7 @@ pub async fn run(
 
     if let Err(e) = command
         .create_followup(
-            &ctx.http,
+            cache_http,
             CreateInteractionResponseFollowup::new().embed(recap_embed),
         )
         .await
@@ -654,7 +655,7 @@ pub async fn run(
             let embed = format_analysis_error_embed(&summoner_display, "match data not found");
             let _ = command
                 .create_followup(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponseFollowup::new().embed(embed),
                 )
                 .await;
@@ -670,7 +671,7 @@ pub async fn run(
                 format_analysis_error_embed(&summoner_display, "could not retrieve match data");
             let _ = command
                 .create_followup(
-                    &ctx.http,
+                    cache_http,
                     CreateInteractionResponseFollowup::new().embed(embed),
                 )
                 .await;
@@ -681,7 +682,7 @@ pub async fn run(
     if !crate::analysis::is_analyzable_mode(&analysis_data.game_mode) {
         let _ = command
             .create_followup(
-                &ctx.http,
+                cache_http,
                 CreateInteractionResponseFollowup::new().content(
                     "🎪 Pas d'analyse pour ce mode de jeu (Arena) : le coach ne gère que \
                      les modes classiques avec lanes et rôles.",
@@ -711,7 +712,7 @@ pub async fn run(
 
     if let Err(e) = command
         .create_followup(
-            &ctx.http,
+            cache_http,
             CreateInteractionResponseFollowup::new().embed(embed),
         )
         .await
@@ -721,13 +722,13 @@ pub async fn run(
 }
 
 async fn send_error_followup(
-    ctx: &Context,
+    cache_http: &impl CacheHttp,
     command: &serenity::model::application::CommandInteraction,
     message: &str,
 ) {
     let _ = command
         .create_followup(
-            &ctx.http,
+            cache_http,
             CreateInteractionResponseFollowup::new().content(message),
         )
         .await;
